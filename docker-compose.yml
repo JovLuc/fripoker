@@ -1,0 +1,14 @@
+services:
+  fripoker:
+    build: .
+    container_name: fripoker
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      # 作弊：CHEAT_ENABLED=1 后，「爸爸」+200、「爷爷」+500、「还钱」还清；刚借完下一手不计息，之后每手×1.1
+      - CHEAT_ENABLED=${CHEAT_ENABLED:-}
+      - CHEAT_BORROW_CHIPS=${CHEAT_BORROW_CHIPS:-200}
+      - CHEAT_GRANDPA_CHIPS=${CHEAT_GRANDPA_CHIPS:-500}
+    restart: unless-stopped

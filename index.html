@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>fripoker</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div id="app" v-cloak>
+    <!-- nickname -->
+    <div v-if="!profile.nickname" class="overlay">
+      <div class="panel narrow">
+        <p class="label">首次进入</p>
+        <h1 class="title">设置昵称</h1>
+        <input
+          class="input"
+          maxlength="16"
+          placeholder="昵称"
+          v-model="nickInput"
+          @keyup.enter="submitNickname"
+        />
+        <button class="btn primary block" @click="submitNickname">进入</button>
+        <p v-if="error" class="error">{{ error }}</p>
+      </div>
+    </div>
+
+    <!-- lobby -->
+    <div v-else-if="screen === 'lobby'" class="lobby">
+      <header class="top">
+        <div class="brand">fripoker</div>
+        <div class="me">
+          <span class="dim">{{ profile.nickname }}</span>
+          <button class="btn ghost" @click="changeNickname">改昵称</button>
+        </div>
+      </header>
+
+      <main class="lobby-main">
+        <div class="lobby-actions">
+          <input class="input room-name" maxlength="20" placeholder="房间名（可选）" v-model="roomName" />
+          <button class="btn primary" @click="createRoom">创建房间</button>
+        </div>
+
+        <p class="label">房间列表</p>
+        <div v-if="rooms.length" class="room-list">
+          <div v-for="r in rooms" :key="r.id" class="room-card">
+            <div class="room-meta">
+              <div class="room-title">{{ r.name }}</div>
+              <div class="room-sub">
+                <span>{{ r.status === 'playing' ? '对局中' : '等待中' }}</span>
+                <span class="sep">·</span>
+                <span>{{ r.humanCount }}/{{ r.maxPlayers }} 人</span>
+                <span class="sep">·</span>
+                <span>{{ (r.humanNames || []).join('、') || '—' }}</span>
+              </div>
+            </div>
+            <div class="room-ops">
+              <button
+                v-if="r.status === 'waiting' && r.humanCount < r.maxPlayers"
+                class="btn"
+                @click="joinRoom(r.id)"
+              >加入</button>
+              <button
+                v-if="r.status === 'playing'"
+                class="btn"
+                @click="joinRoom(r.id)"
+              >观战</button>
+              <button
+                v-if="r.status === 'waiting' && r.humanCount >= r.maxPlayers"
+                class="btn"
+                @click="joinRoom(r.id)"
+              >观战</button>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty">
+          <p>暂无房间</p>
+          <p class="dim">创建一个房间，不足 6 人时会自动补机器人</p>
+        </div>
+      </main>
+
+      <p v-if="error" class="error fixed">{{ error }}</p>
+    </div>
+
+    <!-- game -->
+    <div v-else class="table-screen">
+      <header class="top">
+        <button class="btn ghost" @click="leaveRoom">离开</button>
+        <div class="brand">{{ room.name }}</div>
+        <div class="dim">#{{ room.id }}</div>
+      </header>
+
+      <div class="status-bar">
+        <span v-if="room.status === 'waiting'">等待开局</span>
+        <span v-else>{{ phaseLabel }} · 底池 {{ room.game ? room.game.pot : 0 }}</span>
+        <span v-if="role === 'spectator'" class="tag">观战</span>
+        <span v-else-if="role === 'host'" class="tag">房主</span>
+      </div>
+
+      <!-- waiting room -->
+      <div v-if="room.status === 'waiting'" class="waiting">
+        <p class="label">座位</p>
+        <div class="seat-grid">
+          <div v-for="p in room.humanPlayers" :key="p.id" class="seat-box">
+            <div class="seat-name">{{ p.name }}</div>
+            <div class="dim small">{{ p.id === room.hostId ? '房主' : '玩家' }}</div>
+          </div>
+          <div
+            v-for="i in Math.max(0, room.maxPlayers - room.humanPlayers.length)"
+            :key="'e' + i"
+            class="seat-box empty"
+          >
+            <div class="seat-name dim">空位</div>
+            <div class="dim small">开局补机器人</div>
+          </div>
+        </div>
+        <div class="waiting-ops">
+          <button v-if="role === 'host'" class="btn primary" @click="startGame">开始对局</button>
+          <p class="dim small">1–6 人可开局 · 固定盲注 10/20 · 起始 2000 币 · 破产者观战，剩余继续</p>
+        </div>
+      </div>
+
+      <!-- playing -->
+      <div v-else-if="room.game" class="game-layout">
+        <div class="board-area">
+          <div class="board-row">
+            <div class="busted-log">
+              <div v-if="bustedList.length" class="busted-title">破产</div>
+              <div v-for="b in bustedList" :key="b.id" class="busted-line">{{ b.name }}已破产</div>
+            </div>
+            <div class="board">
+              <div v-for="(c, i) in room.game.board" :key="i" class="card face">
+                <span class="rank">{{ rankOf(c) }}</span>
+                <span class="suit" :class="suitClass(c)">{{ suitOf(c) }}</span>
+              </div>
+              <div
+                v-for="i in Math.max(0, 5 - room.game.board.length)"
+                :key="'ph' + i"
+                class="card slot"
+              ></div>
+            </div>
+            <div class="board-side-pad" aria-hidden="true"></div>
+          </div>
+          <div class="message-slot">
+            <div class="message">{{ (room.game.handOver && room.game.lastResults && room.game.lastResults.length) ? '' : room.game.message }}</div>
+            <div class="results">
+              <template v-if="room.game.lastResults && room.game.handOver">
+                <div v-for="r in room.game.lastResults" :key="r.playerId" class="result-line">
+                  {{ r.name }} +{{ r.amount }}<span v-if="r.hand"> · {{ r.hand }}</span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="players-row">
+          <div
+            v-for="p in room.game.players"
+            :key="p.id"
+            class="player"
+            :class="{
+              me: p.isMe,
+              active: room.game.actionPlayerId === p.id,
+              folded: p.folded,
+              out: p.sittingOut,
+            }"
+          >
+            <div class="player-top">
+              <span class="name">{{ p.name }}<template v-if="p.isBot"> ·机</template></span>
+              <span v-if="p.busted" class="pos on bust-tag">破产</span>
+              <span v-else class="pos" :class="{ on: p.isDealer || p.isSB || p.isBB }">{{ posLabel(p) }}</span>
+            </div>
+            <div class="chips-row">
+              <span class="chips">{{ p.chips }}</span>
+              <span v-if="p.debt > 0" class="debt-amt">-{{ p.debt }}</span>
+              <button
+                v-if="p.isMe && p.debt > 0"
+                class="repay-btn"
+                type="button"
+                :disabled="p.chips < Math.min(500, p.debt)"
+                @click="toggleRepay"
+              >还钱</button>
+            </div>
+            <div class="cards">
+              <div
+                v-for="(c, i) in p.holeCards"
+                :key="i"
+                class="card mini"
+                :class="c === 'back' ? 'back' : 'face'"
+                :data-code="c === 'back' ? '' : c"
+              >
+                <template v-if="c !== 'back'">
+                  <span class="rank">{{ rankOf(c) }}</span>
+                  <span class="suit" :class="suitClass(c)">{{ suitOf(c) }}</span>
+                </template>
+                <template v-else>
+                  <span class="back-mark">·</span>
+                </template>
+              </div>
+            </div>
+            <div class="bet">
+              <span v-if="p.roundBet > 0">{{ p.roundBet }}</span>
+              <span v-else-if="p.lastAction === 'check'">过牌</span>
+              <span v-else-if="p.lastAction === 'fold'" class="dim">弃牌</span>
+              <span v-else-if="p.allIn" class="dim">全下</span>
+              <span v-else-if="p.lastAction">…</span>
+            </div>
+            <div class="hand-label" :class="{ empty: !p.handLabel }">{{ p.handLabel }}</div>
+            <div class="turn-slot" :class="{ on: room.game.actionPlayerId === p.id || p.allIn }">
+              <span v-if="p.allIn" class="turn-dot allin">allin</span>
+              <span v-else-if="room.game.actionPlayerId === p.id" class="turn-dot">轮到</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- action bar: one slot, fixed height, content swaps -->
+        <div class="action-slot">
+          <div v-if="myActionState && room.game.actionPlayerId === profile.playerId" class="action-bar">
+          <div class="action-row">
+            <button class="btn action" @click="sendAction('fold')">弃牌</button>
+            <button class="btn action" @click="sendAction(myActionState.canCheck ? 'check' : 'call')">
+              {{ myActionState.canCheck ? '过牌' : '跟注' + myActionState.needToCall }}
+            </button>
+            <button
+              class="btn action primary"
+              :disabled="raiseTo < myActionState.minRaiseTo && raiseTo < myActionState.maxRaiseTo || raiseTo > myActionState.maxRaiseTo"
+              @click="sendRaise"
+            >
+              {{ raiseLabel }}
+            </button>
+          </div>
+          <div class="slider-row">
+            <div class="slider-row-inner">
+              <button class="step-btn" type="button" aria-label="减10" @click="stepRaise(-10)">−</button>
+              <input
+                type="range"
+                class="slider"
+                :min="raiseMin"
+                :max="raiseMax"
+                :step="1"
+                v-model.number="raiseTo"
+              />
+              <button class="step-btn" type="button" aria-label="加10" @click="stepRaise(10)">+</button>
+            </div>
+            <div class="slider-marks">
+              <button class="chip" type="button" @click="setRaisePreset(0.5)">1/2池</button>
+              <button class="chip" type="button" @click="setRaisePreset(0.66)">2/3池</button>
+              <button class="chip" type="button" @click="setRaisePreset(1)">满池</button>
+              <button class="chip" type="button" @click="raiseTo = raiseMax">全下</button>
+              <span class="raise-val">{{ raiseTo }}</span>
+            </div>
+          </div>
+          <div class="hint-slot">{{ raiseHint || ' ' }}</div>
+        </div>
+
+        <div v-else-if="room.game.handOver" class="action-bar">
+          <span class="dim">{{ readyStatusText }}</span>
+          <div class="action-row ready-row">
+            <template v-if="role === 'spectator'">
+              <span class="dim">观战中</span>
+            </template>
+            <template v-else-if="mySeat && mySeat.chips <= 0">
+              <span class="dim">余额为0 · 聊天借钱后可准备</span>
+            </template>
+            <template v-else-if="mySeat && mySeat.ready">
+              <button class="btn" type="button" disabled>已准备</button>
+            </template>
+            <template v-else-if="mySeat && mySeat.chips > 0">
+              <button class="btn primary" type="button" @click="toggleReady">准备</button>
+            </template>
+          </div>
+          <div v-if="room.game.gameOver" class="action-row">
+            <button class="btn" @click="leaveRoom">返回大厅</button>
+          </div>
+        </div>
+        <div v-else-if="isBusted && room.status === 'playing'" class="action-bar muted">
+          <span class="dim">{{ watchLabel }}</span>
+        </div>
+        <div v-else-if="room.status === 'playing' && !room.game.handOver" class="action-bar muted">
+          <span class="dim">
+            {{ waitingLabel }}
+          </span>
+        </div>
+        </div>
+      </div>
+
+      <!-- floating chat: default top-right, draggable button, panel hangs under button -->
+      <div
+        class="chat-dock"
+        :class="{
+          open: chatOpen,
+          placed: chatPos != null,
+          dragging: chatDragging,
+          [ 'q-' + chatQuadrant ]: true
+        }"
+        :style="chatPos ? { top: chatPos.y + 'px', left: chatPos.x + 'px' } : null"
+      >
+        <button
+          class="chat-toggle"
+          type="button"
+          @mousedown="onChatDragStart"
+          @click="onChatToggleClick"
+        >
+          聊天<span class="chat-count" aria-hidden="true">{{ chatTotal ? ' ' + chatTotal : '  ' }}</span>
+        </button>
+        <div v-if="chatOpen" class="chat-panel">
+          <div id="chat-log" class="chat-log">
+            <div v-for="m in chat" :key="m.id" class="chat-line">
+              <span class="chat-name">{{ m.name }}</span>
+              <span class="chat-text">{{ m.text }}</span>
+            </div>
+            <div v-if="!chat.length" class="chat-empty">暂无消息</div>
+          </div>
+          <div class="chat-input-row">
+            <input
+              class="chat-input"
+              maxlength="200"
+              placeholder="说点什么…"
+              v-model="chatInput"
+              @keyup.enter="sendChat"
+            />
+            <button class="btn chat-send" type="button" @click="sendChat">发送</button>
+          </div>
+        </div>
+      </div>
+
+      <p v-if="error" class="error fixed">{{ error }}</p>
+    </div>
+  </div>
+
+  <script src="./vendor/vue.global.prod.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

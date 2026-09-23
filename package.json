@@ -1,0 +1,14 @@
+{
+  "name": "fripoker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LAN Texas Hold'em for coffee breaks",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
+}
