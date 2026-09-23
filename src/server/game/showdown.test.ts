@@ -42,6 +42,26 @@ function crafted(): GameState {
   return state;
 }
 
+describe("short deck showdown", () => {
+  it("flush beats a full house", () => {
+    const state = crafted();
+    state.shortDeck = true;
+    // big: AAA66 full house; short: K-high spade flush
+    state.players[1].holeCards = [card("Ah"), card("Ac")];
+    state.players[2].holeCards = [card("Ks"), card("Qs")];
+    state.board = [card("Ad"), card("6s"), card("6c"), card("9s"), card("Js")];
+    state.players[2].totalBet = 100; // single 300 pot, both eligible
+    showdown(state);
+    const big = state.players.find((p) => p.id === "big")!;
+    const short = state.players.find((p) => p.id === "short")!;
+    expect(short.chips).toBe(300);
+    expect(big.chips).toBe(0);
+    expect(state.lastResults).toEqual([
+      { playerId: "short", name: "小筹码", amount: 300, hand: "同花" },
+    ]);
+  });
+});
+
 describe("buildPots", () => {
   it("layers side pots by totalBet", () => {
     const pots = buildPots(crafted());

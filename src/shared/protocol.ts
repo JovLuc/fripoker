@@ -133,6 +133,8 @@ export interface RoomSnapshot {
   hostName: string;
   /** Chat cheats on? Host toggles this on the room page; default on. */
   cheatEnabled: boolean;
+  /** Short deck (6+, 36 cards) mode? Host toggles next to the cheat switch; default false = 长牌. */
+  shortDeck: boolean;
   humanPlayers: { id: string; name: string }[];
   /** Host-added bots; they take seats like humans once the game starts. */
   botPlayers: { id: string; name: string }[];
@@ -159,6 +161,7 @@ export type ClientMessage =
   | { type: "ready" }
   | { type: "repay" }
   | { type: "setCheat"; payload: { enabled: boolean } }
+  | { type: "setShortDeck"; payload: { enabled: boolean } }
   | { type: "action"; payload: { action: PlayerActionName; amount?: number } }
   | { type: "chat"; payload: { text: string } }
   | { type: "sync" };

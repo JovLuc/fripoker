@@ -24,6 +24,9 @@ export class Room {
   status: RoomStatus = "waiting";
   /** Chat cheats on? Host toggles from the room page; default on. */
   cheatEnabled = true;
+  /** Short deck (6+) mode? Host toggles from the room page; default off = 长牌.
+   *  Applies from the next deal — mid-hand switching is rejected in app.ts. */
+  shortDeck = false;
   readonly createdAt = Date.now();
   humanPlayers: SeatPlayer[];
   /** Host-added bots; occupy seats like humans once the game starts. */

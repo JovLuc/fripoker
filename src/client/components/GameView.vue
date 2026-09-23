@@ -4,7 +4,7 @@ import GameLayout from "./GameLayout.vue";
 import WaitingRoom from "./WaitingRoom.vue";
 import { error } from "../stores/error.js";
 import { phaseLabel, role, room } from "../stores/room.js";
-import { leaveRoom, setRoomCheat } from "../stores/session.js";
+import { leaveRoom, setRoomCheat, setRoomShortDeck } from "../stores/session.js";
 </script>
 
 <template>
@@ -27,6 +27,15 @@ import { leaveRoom, setRoomCheat } from "../stores/session.js";
         @click="setRoomCheat(!room.cheatEnabled)"
       >借钱:{{ room.cheatEnabled ? '开' : '关' }}</button>
       <span v-else-if="room.cheatEnabled" class="tag">借钱</span>
+      <button
+        v-if="role === 'host'"
+        class="tag-btn"
+        type="button"
+        :disabled="!!room.game && !room.game.handOver"
+        title="短牌 6+：36 张（≥6），三条>顺子、同花>葫芦；本手结束后生效"
+        @click="setRoomShortDeck(!room.shortDeck)"
+      >牌型:{{ room.shortDeck ? '短牌' : '长牌' }}</button>
+      <span v-else-if="room.shortDeck" class="tag">短牌</span>
     </div>
 
     <!-- both stay mounted; only visibility toggles (no re-mount reflow) -->

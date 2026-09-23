@@ -1,5 +1,10 @@
 // 5–7 card hand evaluation. category 0..8 (high card → straight flush);
 // compareEval(a, b) > 0 means a wins. Names are Chinese for direct UI use.
+//
+// Short deck (6+) mode renumbers categories to the 6+ ranking — trips beat
+// straights, flushes beat full houses — and lets A-6-7-8-9 make the lowest
+// straight. Both hands of a comparison are always evaluated in the same mode,
+// so compareEval stays a plain category/tiebreak comparison.
 
 import { RANK_VALUE } from "./cards.js";
 import type { Card } from "./types.js";
@@ -10,8 +15,11 @@ export interface HandEval {
   name: string;
 }
 
-/** Highest straight top card among the given rank values; 5 for the wheel; 0 if none. */
-export function straightHighFromRanks(rankSetInput: Iterable<number>): number {
+/**
+ * Highest straight top card among the given rank values; 5 for the wheel;
+ * 9 for the short-deck wheel A-6-7-8-9 (ace below 6); 0 if none.
+ */
+export function straightHighFromRanks(rankSetInput: Iterable<number>, shortDeck = false): number {
   const set = new Set(rankSetInput);
   if (set.has(14)) set.add(1);
   let run = 0;
@@ -24,10 +32,11 @@ export function straightHighFromRanks(rankSetInput: Iterable<number>): number {
     }
   }
   if (set.has(14) && set.has(2) && set.has(3) && set.has(4) && set.has(5)) return 5;
+  if (shortDeck && set.has(14) && set.has(6) && set.has(7) && set.has(8) && set.has(9)) return 9;
   return 0;
 }
 
-function findStraightFlush(cards: Card[]): number {
+function findStraightFlush(cards: Card[], shortDeck: boolean): number {
   const bySuit = new Map<string, Set<number>>();
   for (const c of cards) {
     let ranks = bySuit.get(c.suit);
@@ -38,13 +47,19 @@ function findStraightFlush(cards: Card[]): number {
     ranks.add(RANK_VALUE[c.rank]);
   }
   for (const ranks of bySuit.values()) {
-    const high = straightHighFromRanks(ranks);
+    const high = straightHighFromRanks(ranks, shortDeck);
     if (high) return high;
   }
   return 0;
 }
 
-export function evaluate7(cards: Card[]): HandEval {
+export function evaluate7(cards: Card[], shortDeck = false): HandEval {
+  // In short deck trips sit above straights and flushes above full houses.
+  const catTrips = shortDeck ? 4 : 3;
+  const catStraight = shortDeck ? 3 : 4;
+  const catFlush = shortDeck ? 6 : 5;
+  const catFull = shortDeck ? 5 : 6;
+
   const ranks = cards.map((c) => RANK_VALUE[c.rank]);
   const suitCounts: Record<string, number> = {};
   for (const c of cards) suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
@@ -57,7 +72,7 @@ export function evaluate7(cards: Card[]): HandEval {
     .sort((a, b) => b.count - a.count || b.rank - a.rank);
 
   if (flushSuit) {
-    const sf = findStraightFlush(cards.filter((c) => c.suit === flushSuit));
+    const sf = findStraightFlush(cards.filter((c) => c.suit === flushSuit), shortDeck);
     if (sf) return { category: 8, tiebreak: [sf], name: "同花顺" };
   }
 
@@ -69,19 +84,23 @@ export function evaluate7(cards: Card[]): HandEval {
 
   const trips = groups.filter((g) => g.count >= 3).map((g) => g.rank).sort((a, b) => b - a);
   // full house: trips + pair (a second trips also contributes its pair)
-  if (trips.length >= 1) {
+  const fullHouse = (): HandEval | null => {
+    if (!trips.length) return null;
     const trip = trips[0];
     const pairRanks = groups
       .filter((g) => g.count >= 2 && g.rank !== trip)
       .map((g) => g.rank)
       .sort((a, b) => b - a);
-    if (trips.length >= 2) {
-      const trip2 = trips[1];
-      return { category: 6, tiebreak: [trip, trip2], name: "葫芦" };
-    }
-    if (pairRanks.length >= 1) {
-      return { category: 6, tiebreak: [trip, pairRanks[0]], name: "葫芦" };
-    }
+    if (trips.length >= 2) return { category: catFull, tiebreak: [trip, trips[1]], name: "葫芦" };
+    if (pairRanks.length >= 1) return { category: catFull, tiebreak: [trip, pairRanks[0]], name: "葫芦" };
+    return null;
+  };
+
+  // Long deck ranks the full house over the flush; short deck flips both
+  // pairs (flush > full house > trips > straight), so the two checks swap.
+  if (!shortDeck) {
+    const fh = fullHouse();
+    if (fh) return fh;
   }
 
   if (flushSuit) {
@@ -90,16 +109,21 @@ export function evaluate7(cards: Card[]): HandEval {
     ]
       .sort((a, b) => b - a)
       .slice(0, 5);
-    return { category: 5, tiebreak: flushRanks, name: "同花" };
+    return { category: catFlush, tiebreak: flushRanks, name: "同花" };
   }
 
-  const sh = straightHighFromRanks(ranks);
-  if (sh) return { category: 4, tiebreak: [sh], name: "顺子" };
+  if (shortDeck) {
+    const fh = fullHouse();
+    if (fh) return fh;
+  }
+
+  const sh = straightHighFromRanks(ranks, shortDeck);
+  if (sh) return { category: catStraight, tiebreak: [sh], name: "顺子" };
 
   if (trips.length >= 1) {
     const trip = trips[0];
     const kickers = ranks.filter((r) => r !== trip).sort((a, b) => b - a).slice(0, 2);
-    return { category: 3, tiebreak: [trip, ...kickers], name: "三条" };
+    return { category: catTrips, tiebreak: [trip, ...kickers], name: "三条" };
   }
 
   const pairRanks = groups.filter((g) => g.count >= 2).map((g) => g.rank).sort((a, b) => b - a);
@@ -131,11 +155,11 @@ export function compareEval(a: HandEval, b: HandEval): number {
 }
 
 /** Best visible hand name for UI: preflop uses the 2 cards; flop+ evaluates fully. */
-export function describeHand(holeCards: Card[], board: Card[]): string {
+export function describeHand(holeCards: Card[], board: Card[], shortDeck = false): string {
   if (!holeCards || holeCards.length < 2) return "";
   if (board && board.length >= 3) {
     const all = [...holeCards, ...board];
-    if (all.length >= 5) return evaluate7(all).name;
+    if (all.length >= 5) return evaluate7(all, shortDeck).name;
   }
   const a = RANK_VALUE[holeCards[0].rank];
   const b = RANK_VALUE[holeCards[1].rank];

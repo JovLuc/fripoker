@@ -81,6 +81,57 @@ describe("evaluate7 categories", () => {
   });
 });
 
+describe("short deck (6+) rankings", () => {
+  it("flush beats a full house", () => {
+    const fh = hand("Ah Ac Ad 6s 6c 9h 9d"); // AAA66
+    const flush = hand("6s 7s 9s Js Qs Ah Ad"); // queen-high flush + pair aces
+    expect(evaluate7(fh, true).name).toBe("葫芦");
+    expect(evaluate7(flush, true).name).toBe("同花");
+    expect(compareEval(evaluate7(flush, true), evaluate7(fh, true))).toBeGreaterThan(0);
+    // the same shapes under long-deck rules flip back
+    expect(compareEval(evaluate7(fh), evaluate7(flush))).toBeGreaterThan(0);
+  });
+
+  it("trips beat a straight", () => {
+    const trips = hand("Ah Ac Ad 6s 7h 9c Kd"); // AAA, no 5-run (needs the 8)
+    const straight = hand("6s 7h 8d 9c Th Kd Kc"); // ten-high straight + pair K
+    expect(evaluate7(trips, true).name).toBe("三条");
+    expect(evaluate7(straight, true).name).toBe("顺子");
+    expect(compareEval(evaluate7(trips, true), evaluate7(straight, true))).toBeGreaterThan(0);
+    expect(compareEval(evaluate7(straight), evaluate7(trips))).toBeGreaterThan(0);
+  });
+
+  it("A-6-7-8-9 is the lowest straight (nine-high)", () => {
+    const wheel = evaluate7(hand("Ah 6c 7d 8s 9h Kc Kd"), true);
+    expect(wheel.name).toBe("顺子");
+    expect(wheel.tiebreak).toEqual([9]);
+    const tenHigh = evaluate7(hand("6s 7h 8d 9c Th Kd Kc"), true);
+    expect(compareEval(tenHigh, wheel)).toBeGreaterThan(0);
+  });
+
+  it("A-6-7-8-9 suited is a straight flush", () => {
+    const sf = evaluate7(hand("Ah 6h 7h 8h 9h Kc Kd"), true);
+    expect(sf.name).toBe("同花顺");
+    expect(sf.tiebreak).toEqual([9]);
+  });
+
+  it("renumbers categories only in short mode", () => {
+    // short: straight 3 / trips 4 / flush 6 / full house 5
+    expect(evaluate7(hand("6s 7h 8d 9c Th Kd Kc"), true).category).toBe(3);
+    expect(evaluate7(hand("Ah Ac Ad 6s 7h 9c Kd"), true).category).toBe(4);
+    expect(evaluate7(hand("6s 7s 9s Js Qs Ah Ad"), true).category).toBe(6);
+    expect(evaluate7(hand("Ah Ac Ad 6s 6c 9h 9d"), true).category).toBe(5);
+    // long: straight 4 / trips 3 (flush/full house stay 5/6)
+    expect(evaluate7(hand("6s 7h 8d 9c Th Kd Kc")).category).toBe(4);
+    expect(evaluate7(hand("Ah Ac Ad 6s 7h 9c Kd")).category).toBe(3);
+  });
+
+  it("describeHand honors short deck", () => {
+    expect(describeHand(hand("Ah Ac"), hand("Ad 6s 6c 9h 9d"), true)).toBe("葫芦");
+    expect(describeHand(hand("Ks Qs"), hand("Ad 6s 6c 9s Js"), true)).toBe("同花");
+  });
+});
+
 describe("describeHand", () => {
   it("pocket aces preflop", () => {
     expect(describeHand(hand("Ah Ac"), [])).toBe("一对 A");

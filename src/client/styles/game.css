@@ -33,7 +33,7 @@
   color: var(--text);
 }
 
-/* clickable .tag look — host's borrow switch in the status bar */
+/* clickable .tag look — host's status-bar switches (borrow / deck mode) */
 .tag-btn {
   background: transparent;
   border: 1px solid var(--line-strong);
@@ -45,6 +45,11 @@
 
 .tag-btn:hover {
   border-color: var(--white);
+}
+
+.tag-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .waiting {

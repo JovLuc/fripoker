@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BIG_BLIND, SMALL_BLIND, STARTING_CHIPS } from "../../shared/constants.js";
+import { RANK_VALUE } from "./cards.js";
 import type { Card, Rank, Suit } from "./types.js";
 import { applyAction, createGameState, legalActions, startHand, stepAfterAction } from "./handFlow.js";
 
@@ -55,6 +56,29 @@ describe("createGameState", () => {
     expect(state.players[2].holeCards).toHaveLength(0);
     // blinds rotate among present players only
     expect([state.dealerIndex, state.sbIndex, state.bbIndex]).not.toContain(2);
+  });
+
+  it("defaults to the 52-card long deck", () => {
+    const state = headsUpState();
+    expect(state.shortDeck).toBe(false);
+    expect(state.deck).toHaveLength(52);
+  });
+
+  it("short deck mode deals and reshuffles only ranks 6..A", () => {
+    const state = createGameState(
+      [
+        { id: "p1", name: "甲", isBot: false },
+        { id: "p2", name: "乙", isBot: false },
+      ],
+      { shortDeck: true },
+    );
+    expect(state.shortDeck).toBe(true);
+    expect(state.deck).toHaveLength(36);
+    startHand(state);
+    const seen = state.players.flatMap((p) => p.holeCards);
+    expect(seen).toHaveLength(4);
+    expect([...seen, ...state.deck]).toHaveLength(36);
+    expect([...seen, ...state.deck].every((c) => RANK_VALUE[c.rank] >= 6)).toBe(true);
   });
 });
 

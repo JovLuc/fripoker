@@ -74,6 +74,8 @@ export interface GameState {
   message: string;
   smallBlind: number;
   bigBlind: number;
+  /** Short deck (6+) rules: 36-card deck, trips>straight, flush>full house. */
+  shortDeck: boolean;
   /** Append-only bust history; never cleared on rebuy/borrow. */
   busted: { id: string; name: string }[];
 }

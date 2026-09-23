@@ -2,7 +2,7 @@
 // Everything under game/ is pure: no I/O, no rooms, no timers.
 
 export * from "./types.js";
-export { RANKS, RANK_VALUE, SUITS, createDeck, shuffle } from "./cards.js";
+export { RANKS, RANK_VALUE, SHORT_DECK_MIN_RANK, SUITS, createDeck, shuffle } from "./cards.js";
 export { compareEval, describeHand, evaluate7 } from "./evaluator.js";
 export type { HandEval } from "./evaluator.js";
 export {

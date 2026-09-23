@@ -21,6 +21,7 @@ export function serializeFor(room: Room, viewerId: string): RoomSnapshot {
     hostId: room.hostId,
     hostName: room.hostName,
     cheatEnabled: room.cheatEnabled,
+    shortDeck: room.shortDeck,
     humanPlayers: room.humanPlayers.map((p) => ({ id: p.id, name: p.name })),
     botPlayers: room.botPlayers.map((p) => ({ id: p.id, name: p.name })),
     spectators: room.spectators.map((s) => ({ id: s.id, name: s.name })),
@@ -44,7 +45,7 @@ export function serializeFor(room: Room, viewerId: string): RoomSnapshot {
     const revealHole = p.holeCards.length > 0 && (isMe || g.revealAll);
     let handLabel = "";
     if (revealHole && p.holeCards.length === 2 && !p.folded && !p.sittingOut) {
-      handLabel = describeHand(p.holeCards, g.board);
+      handLabel = describeHand(p.holeCards, g.board, g.shortDeck);
     }
     return {
       id: p.id,

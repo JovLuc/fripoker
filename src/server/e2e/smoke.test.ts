@@ -374,6 +374,63 @@ describe("e2e: full room flow", () => {
     }
   });
 
+  it("short deck: default off, host toggle, mid-hand switch rejected, 36-card deal", async () => {
+    const app3 = createServerApp(testConfig());
+    const { port: p3 } = await app3.listen();
+    let closer: TestClient | undefined;
+    try {
+      const host = await TestClient.connect(p3);
+      closer = host;
+      host.send({ type: "setNickname", payload: { nickname: "S1", playerId: "p_s1" } });
+      await host.next("profile");
+      host.send({ type: "createRoom", payload: {} });
+      await host.next("joined");
+      const fresh = await host.next("room");
+      expect(fresh.payload.shortDeck).toBe(false);
+
+      host.send({ type: "addBot" });
+      await host.roomWhere((s) => s.botPlayers.length === 1, 5000, "bot seated");
+
+      host.send({ type: "setShortDeck", payload: { enabled: true } });
+      await host.roomWhere((s) => s.shortDeck === true, 5000, "short deck on");
+      host.send({ type: "startGame" });
+      await host.roomWhere((s) => s.game != null, 5000, "short-deck game start");
+
+      // the idle host never acts, so the hand is guaranteed mid-flight here
+      host.send({ type: "setShortDeck", payload: { enabled: false } });
+      const err = await host.next("error");
+      expect(err.payload.message).toBe("本手进行中，结束后才能切换牌型");
+
+      // dealt cards carry no rank below 6
+      const dealt = host.lastRoom!.game!.players.find((p) => p.id === "p_s1")!.holeCards;
+      expect(dealt).toHaveLength(2);
+      expect(dealt.every((c) => /^[6-9TJQKA]/.test(c))).toBe(true);
+
+      // host folds when their turn comes; the bot takes the hand to the end
+      let hostFolded = false;
+      await until(() => {
+        const g = host.lastRoom?.game;
+        if (!g) return false;
+        if (!g.handOver && !hostFolded && g.actionPlayerId === "p_s1") {
+          hostFolded = true;
+          host.send({ type: "action", payload: { action: "fold" } });
+        }
+        return g.handOver;
+      }, 15000, "short-deck hand end");
+      expect(hostFolded).toBe(true);
+      const g = host.lastRoom!.game!;
+      const total = g.players.reduce((sum, p) => sum + p.chips, 0);
+      expect(total).toBe(2000 * 2);
+
+      // hand over: switching back (long deck) now goes through
+      host.send({ type: "setShortDeck", payload: { enabled: false } });
+      await host.roomWhere((s) => s.shortDeck === false, 5000, "back to long deck");
+    } finally {
+      if (closer && closer.ws.readyState !== WebSocket.CLOSED) await closer.close();
+      await app3.close();
+    }
+  });
+
   it("empty room is destroyed when everyone leaves", async () => {
     await alice.close();
     await until(() => app.registry.get(roomId) == null, 5000, "room destroyed");

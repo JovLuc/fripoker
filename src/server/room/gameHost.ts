@@ -41,7 +41,7 @@ export class GameHost {
       ...room.botPlayers.map((p) => ({ id: p.id, name: p.name, isBot: true })),
     ];
     if (seats.length < 2) return { ok: false, error: "人数不足 · 至少 2 名玩家，可先添加机器人" };
-    room.game = createGameState(seats);
+    room.game = createGameState(seats, { shortDeck: room.shortDeck });
     room.status = "playing";
     room.readyIds = new Set();
     const result = startHand(room.game);

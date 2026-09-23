@@ -1,6 +1,10 @@
 // Bot heuristics — botDecide(state, playerId) → {action, amount?}.
 // Randomized thresholds keep bots from being trivially exploitable.
 // Invariant tested in bot.test.ts: whatever it returns, applyAction accepts it.
+//
+// Short deck (6+) uses its own preflop table (pairs/big cards dominate the
+// 36-card deck) and re-maps evaluator categories, which the short-deck
+// evaluate7 already numbers per 6+ ranking. Same decision skeleton otherwise.
 
 import { RANK_VALUE, evaluate7, legalActions } from "../game/index.js";
 import type { Card, GameState, Player } from "../game/index.js";
@@ -40,23 +44,71 @@ export function preflopStrength(hole: Card[]): number {
   return 0.3;
 }
 
+/**
+ * Short deck preflop: with only 6..A in the deck, pairs and high cards carry
+ * far more equity (AA ~78% HU vs ~85% in a full deck; every pair is above
+ * average). Suitedness matters less — flushes are rarer relative to the deck.
+ */
+export function shortDeckPreflopStrength(hole: Card[]): number {
+  const [a, b] = hole;
+  const ra = RANK_VALUE[a.rank];
+  const rb = RANK_VALUE[b.rank];
+  const suited = a.suit === b.suit;
+  const hi = Math.max(ra, rb);
+  const lo = Math.min(ra, rb);
+  const gap = hi - lo;
+
+  if (ra === rb) {
+    if (ra >= 13) return 0.92; // AA / KK
+    if (ra >= 11) return 0.84; // QQ / JJ
+    if (ra >= 9) return 0.76;  // TT / 99
+    return 0.66;               // 88 / 77 / 66
+  }
+  if (hi === 14) {
+    if (lo >= 12) return suited ? 0.84 : 0.8; // AK / AQ
+    if (lo >= 10) return suited ? 0.74 : 0.7; // AJ / AT
+    return suited ? 0.6 : 0.56;               // A9..A6
+  }
+  if (hi >= 12 && lo >= 10) return suited ? 0.7 : 0.64;   // KQ..QT, QJ
+  if (gap <= 2 && hi >= 10) return suited ? 0.6 : 0.54;   // ten-high connectors
+  if (hi >= 12 && lo >= 8) return suited ? 0.56 : 0.5;
+  if (suited) return 0.46;
+  if (hi >= 11) return 0.44;
+  return 0.32;
+}
+
 /** Cheap postflop proxy: made-hand category first, high cards fallback. */
-function boardStrength(hole: Card[], board: Card[]): number {
+function boardStrength(hole: Card[], board: Card[], shortDeck: boolean): number {
   const cards = [...hole, ...board];
   if (cards.length >= 5) {
-    const ev = evaluate7(cards);
-    if (ev.category >= 3) return 0.9;
-    if (ev.category === 2) return 0.7;
-    if (ev.category === 1) {
-      const top = ev.tiebreak[0];
-      if (top >= 12) return 0.6;
-      return 0.5;
+    const ev = evaluate7(cards, shortDeck);
+    const pairTail = (): number => {
+      if (ev.category === 2) return 0.7;
+      if (ev.category === 1) {
+        const top = ev.tiebreak[0];
+        if (top >= 12) return 0.6;
+        return 0.5;
+      }
+      const hi = Math.max(...hole.map((c) => RANK_VALUE[c.rank]));
+      if (hi >= 13) return 0.45;
+      return 0.35;
+    };
+    if (shortDeck) {
+      // categories here are 6+ numbered: flush 6 / full house 5 / trips 4 / straight 3
+      if (ev.category >= 6) return 0.9;
+      if (ev.category === 5) return 0.82;
+      if (ev.category === 4) return 0.75;
+      if (ev.category === 3) return 0.65;
+      return pairTail();
     }
-    const hi = Math.max(...hole.map((c) => RANK_VALUE[c.rank]));
-    if (hi >= 13) return 0.45;
-    return 0.35;
+    if (ev.category >= 3) return 0.9;
+    return pairTail();
   }
-  return preflopStrength(hole) * 0.5;
+  return preflopStrengthOf(shortDeck, hole) * 0.5;
+}
+
+function preflopStrengthOf(shortDeck: boolean, hole: Card[]): number {
+  return shortDeck ? shortDeckPreflopStrength(hole) : preflopStrength(hole);
 }
 
 export function botDecide(state: GameState, playerId: string): BotDecision | null {
@@ -74,8 +126,8 @@ function decide(state: GameState, playerId: string): BotDecision | null {
   const rand = Math.random();
   const strength =
     state.phase === "preflop" && state.board.length === 0
-      ? preflopStrength(player.holeCards)
-      : boardStrength(player.holeCards, state.board);
+      ? preflopStrengthOf(state.shortDeck, player.holeCards)
+      : boardStrength(player.holeCards, state.board, state.shortDeck);
 
   const potOdds = needToCall > 0 ? needToCall / (pot + needToCall) : 0;
   const infl = needToCall / Math.max(1, stack + player.roundBet);

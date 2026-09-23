@@ -266,6 +266,25 @@ export function createServerApp(config: ServerConfig): ServerApp {
         return;
       }
 
+      case "setShortDeck": {
+        const room = conn.roomId ? registry.get(conn.roomId) : null;
+        if (!room) {
+          conn.sendError("不在房间中");
+          return;
+        }
+        if (room.hostId !== conn.playerId) {
+          conn.sendError("只有房主可以切换牌型");
+          return;
+        }
+        if (room.game && !room.game.handOver) {
+          conn.sendError("本手进行中，结束后才能切换牌型");
+          return;
+        }
+        room.shortDeck = msg.payload.enabled;
+        broadcastRoom(room);
+        return;
+      }
+
       case "action": {
         const room = conn.roomId ? registry.get(conn.roomId) : null;
         if (!room || !conn.playerId) {
@@ -369,6 +388,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return { type: obj.type };
     case "setCheat":
       return { type: "setCheat", payload: { enabled: payload?.enabled === true } };
+    case "setShortDeck":
+      return { type: "setShortDeck", payload: { enabled: payload?.enabled === true } };
     case "createRoom": {
       const name = str(payload?.name).trim().slice(0, 20);
       return { type: "createRoom", payload: name ? { name } : {} };

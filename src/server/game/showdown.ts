@@ -47,7 +47,7 @@ export function awardPots(state: GameState): void {
   for (const p of state.players) {
     if (p.folded || p.holeCards.length < 2) continue;
     const all = [...p.holeCards, ...state.board];
-    if (all.length >= 5) evals.set(p.id, evaluate7(all));
+    if (all.length >= 5) evals.set(p.id, evaluate7(all, state.shortDeck));
   }
 
   const wins = new Map<string, number>();

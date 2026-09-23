@@ -63,7 +63,8 @@ export interface SeatSeed {
   isBot: boolean;
 }
 
-export function createGameState(seats: SeatSeed[]): GameState {
+export function createGameState(seats: SeatSeed[], opts: { shortDeck?: boolean } = {}): GameState {
+  const shortDeck = !!opts.shortDeck;
   const players = seats.map((s, i) => createPlayer(s.id, s.name, s.isBot, i));
 
   return {
@@ -71,7 +72,7 @@ export function createGameState(seats: SeatSeed[]): GameState {
     phase: "idle",
     players,
     board: [],
-    deck: shuffle(createDeck()),
+    deck: shuffle(createDeck(shortDeck)),
     pot: 0,
     currentBet: 0,
     lastRaiseSize: BIG_BLIND,
@@ -86,6 +87,7 @@ export function createGameState(seats: SeatSeed[]): GameState {
     message: "已开局，等待发牌",
     smallBlind: SMALL_BLIND,
     bigBlind: BIG_BLIND,
+    shortDeck,
     busted: [],
   };
 }
@@ -119,7 +121,7 @@ function resetHand(state: GameState): boolean {
     }
   }
   state.board = [];
-  state.deck = shuffle(createDeck());
+  state.deck = shuffle(createDeck(state.shortDeck));
   state.pot = 0;
   state.currentBet = 0;
   state.lastRaiseSize = BIG_BLIND;

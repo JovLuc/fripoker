@@ -19,6 +19,7 @@ export const room = reactive({
   hostId: "",
   hostName: "",
   cheatEnabled: true,
+  shortDeck: false,
   humanPlayers: [] as RoomSnapshot["humanPlayers"],
   botPlayers: [] as RoomSnapshot["botPlayers"],
   spectators: [] as RoomSnapshot["spectators"],
@@ -33,6 +34,7 @@ export function applyRoomSnapshot(snap: RoomSnapshot): void {
   room.hostId = snap.hostId;
   room.hostName = snap.hostName;
   room.cheatEnabled = snap.cheatEnabled;
+  room.shortDeck = !!snap.shortDeck;
   room.humanPlayers = snap.humanPlayers || [];
   room.botPlayers = snap.botPlayers || [];
   room.spectators = snap.spectators || [];
@@ -57,6 +59,7 @@ export function resetRoomState(): void {
   room.id = "";
   room.status = "waiting";
   room.cheatEnabled = true;
+  room.shortDeck = false;
   role.value = "player";
   resetChat();
 }

@@ -185,6 +185,12 @@ export function setRoomCheat(enabled: boolean): void {
   ws.send({ type: "setCheat", payload: { enabled } });
 }
 
+/** Host-only 长牌/短牌 switch; server rejects it mid-hand, so the next deal
+ *  always plays with the new mode. */
+export function setRoomShortDeck(enabled: boolean): void {
+  ws.send({ type: "setShortDeck", payload: { enabled } });
+}
+
 export function sendAction(action: PlayerActionName): void {
   ws.send({ type: "action", payload: { action } });
   clearError();

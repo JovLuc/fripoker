@@ -20,17 +20,17 @@ game/ 只 import shared —— 零 I/O、零定时器，全部可单测
 | `net/staticFiles.ts` | 静态服务：`/fpk` 别名 + BASE_PATH、`stripBase`、`safeJoin` 防穿越、SPA 回退、`no-cache` | `createStaticHandler` |
 | `net/connections.ts` | `ClientConn`：playerId/nickname/roomId 不再挂 ws 上；稳定观战 viewerId；`send/sendError/close` | `ClientConn` |
 | `lobby/lobby.ts` | 大厅 socket 集合 + `rooms` 广播 | `LobbyHub` |
-| `room/room.ts` | `Room` 实体（真人/机器人座位/观战/聊天/readyIds/`cheatEnabled`/**唯一 botTimer**）+ `joinRoom`/`leaveRoom` 成员操作 + `addRoomBot`/`removeRoomBot`（房主增减机器人，仅 waiting，移除为 LIFO） | `Room` `joinRoom` `leaveRoom` `addRoomBot` `removeRoomBot` |
+| `room/room.ts` | `Room` 实体（真人/机器人座位/观战/聊天/readyIds/`cheatEnabled`/`shortDeck`/**唯一 botTimer**）+ `joinRoom`/`leaveRoom` 成员操作 + `addRoomBot`/`removeRoomBot`（房主增减机器人，仅 waiting，移除为 LIFO） | `Room` `joinRoom` `leaveRoom` `addRoomBot` `removeRoomBot` |
 | `room/roomManager.ts` | 房间注册表（原全局 Map 的替代）+ 大厅列表 | `RoomRegistry` |
 | `room/gameHost.ts` | 对局编排：开局、ready→自动发牌、动作转发、`afterStep`（破产登记/gameOver/机器人调度） | `GameHost` |
 | `room/serializer.ts` | 按视角快照（底牌可见性）+ 广播 + 单连接快照 | `serializeFor` `broadcastRoom` `sendRoomSnapshot` |
 | `room/chat.ts` | 聊天入列（80 条上限、chatTotal 全量）+ 作弊集成 + 系统消息 | `handleRoomChat` `playerRepay` |
-| `game/cards.ts` | 牌堆 / Fisher-Yates / `RANK_VALUE` | `createDeck` `shuffle` |
-| `game/evaluator.ts` | 5–7 张牌型评估（category 0–8）、比较、UI 牌名 | `evaluate7` `compareEval` `describeHand` |
+| `game/cards.ts` | 牌堆（长 52 / 短 36 张）/ Fisher-Yates / `RANK_VALUE` | `createDeck(shortDeck?)` `shuffle` |
+| `game/evaluator.ts` | 5–7 张牌型评估（category 0–8；短牌模式重排序：三条>顺子、同花>葫芦、A6789 低顺）、比较、UI 牌名 | `evaluate7(cards, shortDeck?)` `compareEval` `describeHand` |
 | `game/handFlow.ts` | 建局（按 `SeatSeed` 席位种子，**不自动补机器人**）、发牌、盲注、动作合法性、街推进、计息 | `createGameState` `startHand` `applyAction` `stepAfterAction` `legalActions` |
 | `game/showdown.ts` | 边池分层、摊牌结算、弃牌获胜、runout | `buildPots` `awardPots` `showdown` `endHandByFold` |
 | `game/economy.ts` | 借钱/还款/破产登记 | `borrowChips` `repayDebt` `noteBusted` `playersWithChips` |
-| `bot/bot.ts` | 启发式决策；**返回值经 clampRaise 钳制在合法区间**（旧版会算出非法加注靠重试自愈，已修复） | `botDecide` |
+| `bot/bot.ts` | 启发式决策（长/短牌各一套翻前牌力表，翻后按模式映射 category）；**返回值经 clampRaise 钳制在合法区间**（旧版会算出非法加注靠重试自愈，已修复） | `botDecide` |
 | `cheat/cheat.ts` | 作弊触发（精确匹配 爸爸/爷爷/还钱）；**房间级开关 `room.cheatEnabled`**（默认开，房主房间页 `setCheat` 切换），金额固定 200/500/500 | `tryChatCheat` |
 
 ## 生命周期（一局）
@@ -53,6 +53,7 @@ game/ 只 import shared —— 零 I/O、零定时器，全部可单测
 - `Player.left`（离开者）单向标记：`playersWithChips`、`allRequiredReady`、`requiredReady`、发牌 eligible、赢家文案均排除；无行动超时，故离开必须即时代弃，本手不能等他
 - 借贷：`debtHands=0` 宽限一手，之后每手 `debt = ceil(debt*11/10)`；还款每次 `min(debt, 500)`
 - 作弊码：房间级 `cheatEnabled` **默认开**；仅房主可 `setCheat` 切换（等待/对局中均可）；金额固定「爸爸」200、「爷爷」500、「还钱」每次 `min(debt, 500)`
+- 长短牌：房间级 `shortDeck` **默认关（长牌）**；仅房主可 `setShortDeck` 切换，且**本手未结束才可切**（进行中由 `app.ts` 拒绝），生效于下一次 `resetHand` 重建牌堆；短牌规则 = 36 张（6..A）+ 6+ 排序 + A 低顺
 - 房间内**唯一**定时器是 `Room.botTimer`；`destroyRoom`/close 时必须 clear
 
 ## 消息路由
