@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { error } from "../stores/error.js";
-import { profile } from "../stores/profile.js";
 import { submitNickname } from "../stores/session.js";
 
 const nickInput = ref("");

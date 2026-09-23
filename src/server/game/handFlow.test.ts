@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BIG_BLIND, SMALL_BLIND, STARTING_CHIPS } from "../../shared/constants.js";
 import { RANK_VALUE } from "./cards.js";
-import type { Card, Rank, Suit } from "./types.js";
 import { applyAction, createGameState, legalActions, startHand, stepAfterAction } from "./handFlow.js";
-
-function card(code: string): Card {
-  const rank = code[0] as Rank;
-  const suit = code[1].toLowerCase() as Suit;
-  return { rank, suit, code: `${rank}${suit.toUpperCase()}` };
-}
 
 /** Two funded humans only; no bots are seeded. */
 function headsUpState() {

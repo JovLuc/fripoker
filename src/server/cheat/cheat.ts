@@ -13,6 +13,9 @@ export type CheatOutcome =
   | { ok: false; error: string; trigger: string };
 
 /**
+ * @param game the acting player's game state (null between hands)
+ * @param playerId the chatting player
+ * @param text the raw chat line
  * @param enabled the room's cheat switch
  * @returns null when the line is not a cheat (or cheats are off) — the caller
  *  then keeps the plain-chat path. Never null for an exact trigger.

@@ -273,7 +273,7 @@ describe("e2e: full room flow", () => {
 
     // host switches off → snapshot reflects, chat cheats stop working
     alice.send({ type: "setCheat", payload: { enabled: false } });
-    await alice.roomWhere((s) => s.cheatEnabled === false, 5000, "cheat off");
+    await alice.roomWhere((s) => !s.cheatEnabled, 5000, "cheat off");
     alice.send({ type: "chat", payload: { text: "爷爷" } });
     await alice.roomWhere(
       (s) => s.game!.players.find((p) => p.id === "p_alice")!.debt === 0,
@@ -283,11 +283,11 @@ describe("e2e: full room flow", () => {
 
     // back on
     alice.send({ type: "setCheat", payload: { enabled: true } });
-    await alice.roomWhere((s) => s.cheatEnabled === true, 5000, "cheat on");
+    await alice.roomWhere((s) => s.cheatEnabled, 5000, "cheat on");
   });
 
   it("reconnect reclaims the seat via saved playerId", async () => {
-    await bob.terminate();
+    bob.terminate();
     await until(() => alice.lastRoom != null, 2000, "snapshot after bob drops");
     // seat kept while playing
     const seatKept = alice.lastRoom!.humanPlayers.some((p) => p.id === "p_bob");
@@ -392,7 +392,7 @@ describe("e2e: full room flow", () => {
       await host.roomWhere((s) => s.botPlayers.length === 1, 5000, "bot seated");
 
       host.send({ type: "setShortDeck", payload: { enabled: true } });
-      await host.roomWhere((s) => s.shortDeck === true, 5000, "short deck on");
+      await host.roomWhere((s) => s.shortDeck, 5000, "short deck on");
       host.send({ type: "startGame" });
       await host.roomWhere((s) => s.game != null, 5000, "short-deck game start");
 
@@ -424,7 +424,7 @@ describe("e2e: full room flow", () => {
 
       // hand over: switching back (long deck) now goes through
       host.send({ type: "setShortDeck", payload: { enabled: false } });
-      await host.roomWhere((s) => s.shortDeck === false, 5000, "back to long deck");
+      await host.roomWhere((s) => !s.shortDeck, 5000, "back to long deck");
     } finally {
       if (closer && closer.ws.readyState !== WebSocket.CLOSED) await closer.close();
       await app3.close();

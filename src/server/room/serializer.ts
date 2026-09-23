@@ -87,7 +87,7 @@ export function serializeFor(room: Room, viewerId: string): RoomSnapshot {
     bigBlind: g.bigBlind,
     message: g.message,
     handOver: g.handOver,
-    gameOver: !!g.gameOver,
+    gameOver: g.gameOver,
     readyIds: [...room.readyIds],
     requiredReady,
     busted: g.busted.map((b) => ({ id: b.id, name: b.name })),

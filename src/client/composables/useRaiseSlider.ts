@@ -4,7 +4,7 @@
 import { computed, ref, watch } from "vue";
 import { clearError, showError } from "../stores/error.js";
 import { myActionState, room } from "../stores/room.js";
-import { sendAction, sendAllIn, sendRaiseTo } from "../stores/session.js";
+import { sendAllIn, sendRaiseTo } from "../stores/session.js";
 
 export function useRaiseSlider() {
   const raiseTo = ref(0);

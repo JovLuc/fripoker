@@ -81,9 +81,7 @@ export const isBusted = computed(() => {
   if (!profile.playerId) return false;
   const me = room.game.players.find((p) => p.id === profile.playerId);
   if (!me) return false;
-  if (me.chips <= 0) return true;
-  if (me.sittingOut && !room.game.handOver) return true;
-  return false;
+  return me.chips <= 0 || (me.sittingOut && !room.game.handOver);
 });
 
 export const watchLabel = computed(() => {
