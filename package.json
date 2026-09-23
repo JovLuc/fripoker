@@ -1,14 +1,36 @@
 {
   "name": "fripoker",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "LAN Texas Hold'em for coffee breaks",
-  "scripts": {
-    "start": "node server/index.js",
-    "dev": "node server/index.js"
+  "type": "module",
+  "engines": {
+    "node": ">=18.19"
   },
-  "type": "commonjs",
+  "scripts": {
+    "dev": "concurrently -n srv,web -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:client": "vite",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vue-tsc -p tsconfig.client.json && vite build",
+    "build:server": "tsc -p tsconfig.server.json && cp scripts/start.sh dist/start.sh && chmod +x dist/start.sh",
+    "start": "node dist/server/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && vue-tsc -p tsconfig.client.json && tsc -p tsconfig.test.json --noEmit"
+  },
   "dependencies": {
     "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0",
+    "vue": "^3.5.13",
+    "vue-tsc": "^2.1.10"
   }
 }

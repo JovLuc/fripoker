@@ -1,51 +1,54 @@
 # docs/client.md
 
-前端 L2：`index.html` + `js/app.js` + `css/style.css`（Vue 3 global，无构建）。总览见 `../AGENTS.md`。
+前端 L2：`src/client/`（Vue 3 SFC + Vite 构建，TS）。总览见 `../AGENTS.md`；wire 类型在 `../src/shared/protocol.ts`。
 
 ## 屏幕流
 
-1. 无昵称 → 覆盖层设昵称（`fripoker_nick` / `fripoker_pid`）
-2. 大厅 `screen=lobby`：列表、创建、加入/观战
-3. 房间 `screen=game`：等待 `waiting` 或对局 `room.game`
+1. 无昵称 → `NicknameOverlay` 覆盖层（`fripoker_nick` / `fripoker_pid`）
+2. 大厅 `screen=lobby`：`LobbyView` 列表 / 创建 / 加入·观战
+3. 房间 `screen=game`：`GameView` → waiting 子视图（`WaitingRoom`）或对局布局（`GameLayout`）+ 浮动 `ChatDock`
 
-WS：`wsUrl()` 按 `location.pathname` 推前缀，**末尾补 `/`** 以匹配 nginx `location /fpk/`。断线 1.5s 重连；有 `fripoker_room` 则自动 `joinRoom`。
+连接：`api/ws.ts` 按 `location.pathname` 推导 WS 前缀，**末尾补 `/`** 匹配 nginx `location /frp/`（dev 模式连 `ws://<host>:3000/`）。断线 1.5s 重连；onopen 重发 `setNickname`，有 `fripoker_room` 自动 `joinRoom`，否则 `listRooms`。
 
 ## 文件
 
 | 路径 | 内容 |
 |------|------|
-| `index.html` | 三屏结构、操作栏、聊天 dock（`chat-dock`）、河牌左侧破产记录 |
-| `js/app.js` | 状态、WS、动作、加注滑杆、聊天拖拽/象限、`isBusted`/`bustedList`、禁右键框选 |
-| `css/style.css` | 黑白极简；**条件块预留 min-height** 防跳动；`.board-row` 三列 |
+| `main.ts` | 入口：挂载 App + 引入 4 个 css |
+| `App.vue` | 根：三屏切换、全局禁右键/框选（成对 add/remove）、`initSession()`（返回 disposer） |
+| `api/ws.ts` | `WsClient`：重连、`onMessage/onOpen`、`awaitType(type)` promise 化请求（替代旧 ensureProfileThen 竞态） |
+| `stores/session.ts` | **编排中枢**：连接生命周期、ServerMessage 分发、全部动作（submitNickname/createRoom/joinRoomById/leaveRoom/toggleReady/toggleRepay/sendAction/sendChatText/…）、2s 轮询（listRooms / sync，可清理） |
+| `stores/room.ts` | 房间快照状态 + 全部 computed（`mySeat` `role` `readyStatusText` `isBusted` `watchLabel` `myActionState` `waitingLabel` `phaseLabel` `bustedList`）；`applyRoomSnapshot` 唯一入口，role 推导仅此一处 |
+| `stores/profile.ts` `lobby.ts` `chat.ts` `error.ts` | 身份持久化 / 房间列表 / 聊天与 dock 开合 / 4s 自动清除的错误 toast |
+| `composables/useRaiseSlider.ts` | raise-to 滑杆：`syncRaise`（handId/actionPlayerId/myLegal 三 watch）、预设、±10、发送（达上限自动转 allin） |
+| `composables/useChatDock.ts` | 拖拽（<4px 视为点击）、四象限、`fripoker_chat_pos` 持久化 |
+| `components/NicknameOverlay.vue` `LobbyView.vue` `GameView.vue` `WaitingRoom.vue` `GameLayout.vue` `BoardArea.vue` `PlayerCard.vue` `ActionBar.vue` `ChatDock.vue` | 与旧版 index.html 区块一一对应 |
+| `styles/{base,lobby,game,chat}.css` | 旧 `style.css` 原样平移；**类名未改**，视觉零回归 |
 
-## 交互要点
+## 交互要点（保持不变）
 
-- **操作**：三按钮 + 滑杆；`stepRaise(±10)`；预设 1/2·2/3·满池·全下；无倒计时
-- **牌型**：`handLabel` 常驻槽位；翻前 `describeHand` 两牌，翻后完整名
-- **结算**：有 `lastResults` 时 message 行可隐藏，只留横线下列表
-- **破产**：河牌左侧 `.busted-log`（`game.busted`，append-only 不清史）显示「xxx已破产」；座位角标用 `players[].busted`（仅 `chips<=0 && !allIn`）；`allIn` 写在 `.turn-slot`（`allin`）
-- **复活**：本手中途借钱（曾破产）保持 `sittingOut`，文案「已复活 · 本手观战，下一手参战」；系统仍提示「重回战局」
-- **借贷**：筹码同一行 `.chips-row`「余额 -债务 [还钱]」；按钮发 `type: repay`（或聊天「还钱」）；系统消息 `+200` / `-金额`
-- **聊天滚动条**：`.chat-log` 细滚动条（`scrollbar-width: thin` + webkit 6px），色用 `--line-strong` / `--dim`
-- **准备开局**：`handOver` 时操作区「准备」（`type: ready`）；0 币不可准备；`requiredReady` 显示进度；全员 ready 自动发牌。破产房主不再被观战分支挡住
-- **布局**：`.board-row` 三列（破产记录 / 公共牌 / 右垫）；`.player` / `.action-slot` / `.message-slot` / `.results` / `.hand-label` 等固定高度
-- **聊天**：默认 `top:40px` 右上；按钮可拖（存 `fripoker_chat_pos`）；按四象限绝对定位面板（TR→左下，TL→右下，BL→右上，BR→左上）；按钮常显 `chatTotal`（全量计数，不受 80 条历史上限影响，定宽 `.chat-count`）
-- **禁选**：`user-select:none` + `contextmenu`/`selectstart`；`input/textarea` 例外
+- **操作**：`ActionBar` 单槽四态互斥（轮到我 / handOver 准备 / 破产观战 / 等待文案）；三按钮 + 滑杆；预设 1/2·2/3·满池·全下；无倒计时
+- **牌型**：`handLabel` 常驻槽位（服务端 `describeHand` 算好下发）
+- **结算**：有 `lastResults` 时 message 置空，只留横线下列表
+- **破产**：河牌左 `.busted-log`（append-only 史）；座位角标 `players[].busted`；`allIn` 写 `.turn-slot`
+- **复活**：中途回归 `sittingOut` → 「已复活 · 本手观战，下一手参战」
+- **借贷**：`.chips-row`「余额 -债务 [还钱]」；按钮发 `repay`（等价聊天「还钱」）
+- **作弊开关**：`GameView` 状态栏——房主见「作弊:开/关」按钮（发 `setCheat`），非房主仅见「作弊」tag（开时）；默认开
+- **聊天**：默认右上可拖；四象限朝视口中心展开；常显 `chatTotal`（全量计数，定宽防跳动）
+- **role**：spectator 粘性（仅重新 join 改变）；joined 载荷设初值，快照在非观战时校正
 
-## 协议字段（room 快照子集）
+## localStorage key
 
-`status` `hostId` `humanPlayers` `chat[]` `game.{handId,phase,board,pot,message,handOver,gameOver,busted[],players[],myLegal,lastResults}`
+`fripoker_pid`（重连座位）`fripoker_nick` `fripoker_room` `fripoker_chat_pos` —— **与旧版完全一致**，老用户无缝迁移。
 
-`players[]`：`isMe` `holeCards` `handLabel` `isDealer/isSB/isBB` `roundBet` `lastAction` `chips` `debt` `busted` `allIn` …
+## 协议
 
-`busted[]`（game 级）：`{id,name}` **append-only** 破产史；再破产再追加，借钱不清史。
-
-新增 UI 状态优先放 `app.js` setup 返回值，并同步本文件「交互要点」。
+双向 `{ type, payload? }`，完整类型见 `src/shared/protocol.ts`（`ClientMessage` / `ServerMessage` 可辨识联合）。此处不重复字段表。
 
 ## 改 UI 检查清单
 
-- [ ] 条件出现/消失是否预留高度  
-- [ ] 操作区 / 等待文案切换是否共用 `action-slot`  
-- [ ] 聊天展开是否仍不挤占主布局  
-- [ ] 破产记录出现/消失时公共牌是否居中  
-- [ ] `node --check js/app.js`  
+- [ ] 条件出现/消失是否预留高度（`.player` 168px、`.action-slot` 168px、`.message-slot`、`.results`、`.hand-label`、`.chat-count` 定宽）
+- [ ] 操作区 / 等待文案切换是否共用 `action-slot`
+- [ ] 聊天展开是否仍不挤占主布局（fixed dock）
+- [ ] 破产记录出现/消失时公共牌是否居中（`.board-row` 三列 + 右垫）
+- [ ] `npm run typecheck`（vue-tsc）通过

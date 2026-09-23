@@ -1,0 +1,192 @@
+/* L2: docs/client.md — monochrome game UI.
+   Conditional blocks keep min-height so layout does not jump (player, slots, chat). */
+:root {
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --line: #2a2a2a;
+  --line-strong: #4a4a4a;
+  --text: #f2f2f2;
+  --dim: #8a8a8a;
+  --dimmer: #4a4a4a;
+  --btn: #141414;
+  --btn-hover: #1f1f1f;
+  --white: #ffffff;
+  --suit-red: #f2f2f2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "SF Mono", "Menlo", "Consolas", "PingFang SC", "Microsoft YaHei", monospace;
+  font-size: 14px;
+  min-height: 100%;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+[v-cloak] {
+  display: none;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+.overlay {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 28px;
+}
+
+.panel.narrow {
+  width: min(360px, 100%);
+}
+
+.title {
+  margin: 0 0 20px;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.label {
+  margin: 0 0 8px;
+  color: var(--dim);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  padding: 12px 14px;
+  outline: none;
+  margin-bottom: 12px;
+}
+
+.input:focus {
+  border-color: var(--white);
+}
+
+.btn {
+  background: var(--btn);
+  border: 1px solid var(--line-strong);
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--btn-hover);
+  border-color: var(--white);
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: var(--white);
+  color: #000;
+  border-color: var(--white);
+  font-weight: 600;
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+.btn.ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--dim);
+}
+
+.btn.ghost:hover {
+  color: var(--white);
+  border-color: var(--white);
+}
+
+.btn.block {
+  width: 100%;
+}
+
+.error {
+  color: var(--text);
+  background: #1a1a1a;
+  border: 1px solid var(--line-strong);
+  padding: 8px 12px;
+  margin-top: 12px;
+}
+
+.error.fixed {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  margin: 0;
+  z-index: 20;
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.small {
+  font-size: 12px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.me {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

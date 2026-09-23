@@ -1,18 +1,26 @@
-FROM node:24-alpine
-
+# Build stage: compile TS (server) and bundle the Vue client.
+FROM node:24-alpine AS build
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci
 
-COPY index.html ./
-COPY css ./css
-COPY js ./js
-COPY vendor ./vendor
-COPY server ./server
+COPY tsconfig*.json vite.config.ts vitest.config.ts index.html ./
+COPY src ./src
+COPY scripts ./scripts
+RUN npm run build
+
+# Runtime stage: production deps + compiled output only.
+FROM node:24-alpine
+WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
-EXPOSE 3000
 
-CMD ["node", "server/index.js"]
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+COPY --from=build /app/dist ./dist
+
+EXPOSE 3000
+CMD ["sh", "dist/start.sh"]
