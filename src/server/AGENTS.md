@@ -20,14 +20,14 @@ game/ 只 import shared —— 零 I/O、零定时器，全部可单测
 | `net/staticFiles.ts` | 静态服务：`/fpk` 别名 + BASE_PATH、`stripBase`、`safeJoin` 防穿越、SPA 回退、`no-cache` | `createStaticHandler` |
 | `net/connections.ts` | `ClientConn`：playerId/nickname/roomId 不再挂 ws 上；稳定观战 viewerId；`send/sendError/close` | `ClientConn` |
 | `lobby/lobby.ts` | 大厅 socket 集合 + `rooms` 广播 | `LobbyHub` |
-| `room/room.ts` | `Room` 实体（座位/观战/聊天/readyIds/`cheatEnabled`/**唯一 botTimer**）+ `joinRoom`/`leaveRoom` 成员操作 | `Room` `joinRoom` `leaveRoom` |
+| `room/room.ts` | `Room` 实体（真人/机器人座位/观战/聊天/readyIds/`cheatEnabled`/**唯一 botTimer**）+ `joinRoom`/`leaveRoom` 成员操作 + `addRoomBot`/`removeRoomBot`（房主增减机器人，仅 waiting，移除为 LIFO） | `Room` `joinRoom` `leaveRoom` `addRoomBot` `removeRoomBot` |
 | `room/roomManager.ts` | 房间注册表（原全局 Map 的替代）+ 大厅列表 | `RoomRegistry` |
 | `room/gameHost.ts` | 对局编排：开局、ready→自动发牌、动作转发、`afterStep`（破产登记/gameOver/机器人调度） | `GameHost` |
 | `room/serializer.ts` | 按视角快照（底牌可见性）+ 广播 + 单连接快照 | `serializeFor` `broadcastRoom` `sendRoomSnapshot` |
 | `room/chat.ts` | 聊天入列（80 条上限、chatTotal 全量）+ 作弊集成 + 系统消息 | `handleRoomChat` `playerRepay` |
 | `game/cards.ts` | 牌堆 / Fisher-Yates / `RANK_VALUE` | `createDeck` `shuffle` |
 | `game/evaluator.ts` | 5–7 张牌型评估（category 0–8）、比较、UI 牌名 | `evaluate7` `compareEval` `describeHand` |
-| `game/handFlow.ts` | 建局（补机器人）、发牌、盲注、动作合法性、街推进、计息 | `createGameState` `startHand` `applyAction` `stepAfterAction` `legalActions` |
+| `game/handFlow.ts` | 建局（按 `SeatSeed` 席位种子，**不自动补机器人**）、发牌、盲注、动作合法性、街推进、计息 | `createGameState` `startHand` `applyAction` `stepAfterAction` `legalActions` |
 | `game/showdown.ts` | 边池分层、摊牌结算、弃牌获胜、runout | `buildPots` `awardPots` `showdown` `endHandByFold` |
 | `game/economy.ts` | 借钱/还款/破产登记 | `borrowChips` `repayDebt` `noteBusted` `playersWithChips` |
 | `bot/bot.ts` | 启发式决策；**返回值经 clampRaise 钳制在合法区间**（旧版会算出非法加注靠重试自愈，已修复） | `botDecide` |
@@ -36,20 +36,21 @@ game/ 只 import shared —— 零 I/O、零定时器，全部可单测
 ## 生命周期（一局）
 
 1. `registry.create` → `status=waiting` → `roomsChanged()`
-2. `gameHost.startGame`：`createGameState(humans)` **补机器人至 6 席**（id `bot_<seat>`，名 东西南北中）→ `startHand`
+2. `gameHost.startGame`：席位 = 真人 + `room.botPlayers`（房主房间页增减，id `bot_<seq>`，名 东西南北中发白梅兰竹菊；<2 席拒绝开局）→ `createGameState(seats)` → `startHand`
 3. 玩家动作：`playerAction` → `applyAction` → `stepAfterAction` → `broadcastRoom` → `afterStep`
 4. 机器人：`afterStep("continue")` → `scheduleBot(700–1300ms)` → `runBotIfNeeded`
 5. `afterStep("hand-end")` → `noteBusted` + **清空 readyIds**；有币者 <2 → `gameOver`；否则等 **所有 chips>0 玩家 ready**（bot 恒 ready）→ `startNextHand` 自动发牌
-6. 断线：`ws.close` → `leaveAll`；playing 房**保留座位**等重连，waiting 房最后一个真人离开即销毁
+6. 断线/离开：`ws.close` 或 `leaveRoom` → `leaveAll` → `leaveRoom` + （playing 房）`gameHost.handleDeparture`：立即代弃（轮到他则走引擎推进，否则静默弃牌、只剩一人则 `endHandByFold`）并标记 `Player.left`——之后每手 `sittingOut`，不参与 ready/续局判定；waiting 房最后一个真人离开即销毁
 
 ## 关键不变量（测试锁死，勿破坏）
 
-- 开局 2000×6 = 12000；盲注 10/20 固定；**无操作超时**
+- 开局 2000×席位数（2–10 席，真人+机器人）；盲注 10/20 固定；**无操作超时**
 - 任意时刻 `Σchips + pot` 守恒（e2e 与 bot 性质测试断言）
 - `compareEval(a,b) > 0` ⇒ a 更好；平分余数给 players 数组序在前者
 - raise 的 amount 语义是 **加注到**（total bet level），不是增量；低于 minRaiseTo 仅允许等于 maxRaiseTo 的全下
 - `serializeFor`：底牌仅 `isMe` 或 `revealAll` 可见；观战者用连接稳定 viewerId
 - `game.busted[]` **append-only**（借钱不清史）；座位角标 `chips<=0 && !allIn` 是另一回事
+- `Player.left`（离开者）单向标记：`playersWithChips`、`allRequiredReady`、`requiredReady`、发牌 eligible、赢家文案均排除；无行动超时，故离开必须即时代弃，本手不能等他
 - 借贷：`debtHands=0` 宽限一手，之后每手 `debt = ceil(debt*11/10)`；还款每次 `min(debt, 500)`
 - 作弊码：房间级 `cheatEnabled` **默认开**；仅房主可 `setCheat` 切换（等待/对局中均可）；金额固定「爸爸」200、「爷爷」500、「还钱」每次 `min(debt, 500)`
 - 房间内**唯一**定时器是 `Room.botTimer`；`destroyRoom`/close 时必须 clear

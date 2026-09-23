@@ -4,7 +4,10 @@ import { createGameState, startHand } from "./handFlow.js";
 import { borrowChips, noteBusted, playersWithChips, repayDebt } from "./economy.js";
 
 function state1() {
-  return createGameState([{ id: "p1", name: "甲" }]);
+  return createGameState([
+    { id: "p1", name: "甲", isBot: false },
+    { id: "p2", name: "乙", isBot: false },
+  ]);
 }
 
 describe("borrowChips", () => {
@@ -68,7 +71,6 @@ describe("borrowChips", () => {
 describe("debt interest", () => {
   it("first deal after borrowing is free, then ×1.1 per hand (integer ceil)", () => {
     const state = state1();
-    for (const p of state.players) if (p.isBot) p.chips = 0; // heads-up vs a bust bot
     borrowChips(state, "p1", 100);
     // hand 1 after borrow: grace, no interest
     startHand(state);
@@ -107,10 +109,12 @@ describe("repayDebt", () => {
 });
 
 describe("playersWithChips / noteBusted", () => {
-  it("counts funded seats only", () => {
+  it("counts funded, present seats only", () => {
     const state = state1();
-    expect(playersWithChips(state)).toHaveLength(6);
+    expect(playersWithChips(state)).toHaveLength(2);
     state.players[0].chips = 0;
-    expect(playersWithChips(state)).toHaveLength(5);
+    expect(playersWithChips(state)).toHaveLength(1);
+    state.players[1].left = true;
+    expect(playersWithChips(state)).toHaveLength(0);
   });
 });

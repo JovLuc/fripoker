@@ -163,6 +163,15 @@ export function startGame(): void {
   ws.send({ type: "startGame" });
 }
 
+/** Host-only, waiting-status bot seat management (server enforces both). */
+export function addRoomBot(): void {
+  ws.send({ type: "addBot" });
+}
+
+export function removeRoomBot(): void {
+  ws.send({ type: "removeBot" });
+}
+
 export function toggleReady(): void {
   ws.send({ type: "ready" });
 }

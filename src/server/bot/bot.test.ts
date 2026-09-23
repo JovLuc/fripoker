@@ -17,9 +17,17 @@ describe("preflopStrength", () => {
   });
 });
 
+/** One human + five bots, like a table the host filled on the room page. */
+function botTable() {
+  return createGameState([
+    { id: "p1", name: "甲", isBot: false },
+    ...["东", "西", "南", "北", "中"].map((name, i) => ({ id: `bot_${i + 1}`, name, isBot: true })),
+  ]);
+}
+
 describe("botDecide", () => {
   it("returns null off turn", () => {
-    const state = createGameState([{ id: "p1", name: "甲" }]);
+    const state = createGameState([{ id: "p1", name: "甲", isBot: false }]);
     startHand(state);
     expect(botDecide(state, "p1")).toBeNull();
   });
@@ -28,7 +36,7 @@ describe("botDecide", () => {
   // random shuffle, the engine must accept it. Runs several full hands.
   it("never produces an action the engine rejects", () => {
     for (let round = 0; round < 8; round++) {
-      const state = createGameState([{ id: "p1", name: "甲" }]);
+      const state = botTable();
       startHand(state);
       let guard = 0;
       while (!state.handOver && guard++ < 300) {

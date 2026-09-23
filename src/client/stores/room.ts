@@ -3,7 +3,7 @@
 
 import { computed, reactive, ref } from "vue";
 import type { GameSnapshot, PlayerView, RoomRole, RoomSnapshot } from "../../shared/protocol.js";
-import { applyChat } from "./chat.js";
+import { applyChat, resetChat } from "./chat.js";
 import { profile } from "./profile.js";
 
 export type Screen = "lobby" | "game";
@@ -20,8 +20,9 @@ export const room = reactive({
   hostName: "",
   cheatEnabled: true,
   humanPlayers: [] as RoomSnapshot["humanPlayers"],
+  botPlayers: [] as RoomSnapshot["botPlayers"],
   spectators: [] as RoomSnapshot["spectators"],
-  maxPlayers: 6,
+  maxPlayers: 10,
   game: null as GameSnapshot | null,
 });
 
@@ -33,8 +34,9 @@ export function applyRoomSnapshot(snap: RoomSnapshot): void {
   room.hostName = snap.hostName;
   room.cheatEnabled = snap.cheatEnabled;
   room.humanPlayers = snap.humanPlayers || [];
+  room.botPlayers = snap.botPlayers || [];
   room.spectators = snap.spectators || [];
-  room.maxPlayers = snap.maxPlayers || 6;
+  room.maxPlayers = snap.maxPlayers || 10;
   room.game = snap.game;
   applyChat(snap.chat, snap.chatTotal);
   deriveRole();
@@ -56,6 +58,7 @@ export function resetRoomState(): void {
   room.status = "waiting";
   room.cheatEnabled = true;
   role.value = "player";
+  resetChat();
 }
 
 // ---------------------------------------------------------------------------
@@ -88,12 +91,7 @@ export const watchLabel = computed(() => {
   return "你已破产 · 只能观战";
 });
 
-export const myActionState = computed(() => {
-  if (!room.game) return null;
-  if (role.value === "spectator") return null;
-  if (isBusted.value) return null;
-  return room.game.myLegal || null;
-});
+export const myActionState = computed(() => room.game?.myLegal || null);
 
 export const readyStatusText = computed(() => {
   if (!room.game) return "";

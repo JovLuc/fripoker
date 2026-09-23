@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BIG_BLIND, MAX_PLAYERS, SMALL_BLIND, STARTING_CHIPS } from "../../shared/constants.js";
+import { BIG_BLIND, SMALL_BLIND, STARTING_CHIPS } from "../../shared/constants.js";
 import type { Card, Rank, Suit } from "./types.js";
 import { applyAction, createGameState, legalActions, startHand, stepAfterAction } from "./handFlow.js";
 
@@ -9,16 +9,12 @@ function card(code: string): Card {
   return { rank, suit, code: `${rank}${suit.toUpperCase()}` };
 }
 
-/** Two funded humans only; bots are bust so tests stay deterministic. */
+/** Two funded humans only; no bots are seeded. */
 function headsUpState() {
-  const state = createGameState([
-    { id: "p1", name: "甲" },
-    { id: "p2", name: "乙" },
+  return createGameState([
+    { id: "p1", name: "甲", isBot: false },
+    { id: "p2", name: "乙", isBot: false },
   ]);
-  for (const p of state.players) {
-    if (p.isBot) p.chips = 0;
-  }
-  return state;
 }
 
 function totalChips(state: ReturnType<typeof createGameState>): number {
@@ -26,21 +22,39 @@ function totalChips(state: ReturnType<typeof createGameState>): number {
 }
 
 describe("createGameState", () => {
-  it("fills the table to MAX_PLAYERS with bots", () => {
-    const state = createGameState([{ id: "p1", name: "甲" }]);
-    expect(state.players).toHaveLength(MAX_PLAYERS);
-    expect(state.players.filter((p) => p.isBot)).toHaveLength(MAX_PLAYERS - 1);
-    expect(state.players[1].id).toBe("bot_1");
+  it("seats exactly the given humans and bots (no auto-fill)", () => {
+    const state = createGameState([
+      { id: "pa", name: "甲", isBot: false },
+      { id: "bot_1", name: "东", isBot: true },
+    ]);
+    expect(state.players).toHaveLength(2);
     expect(state.players.every((p) => p.chips === STARTING_CHIPS)).toBe(true);
   });
 
-  it("humans keep their ids in seat order", () => {
+  it("keeps ids, bot flags and seat order", () => {
     const state = createGameState([
-      { id: "pa", name: "甲" },
-      { id: "pb", name: "乙" },
+      { id: "pa", name: "甲", isBot: false },
+      { id: "pb", name: "乙", isBot: false },
+      { id: "bot_1", name: "东", isBot: true },
     ]);
-    expect(state.players[0]).toMatchObject({ id: "pa", isBot: false });
-    expect(state.players[1]).toMatchObject({ id: "pb", isBot: false });
+    expect(state.players[0]).toMatchObject({ id: "pa", isBot: false, seat: 0 });
+    expect(state.players[1]).toMatchObject({ id: "pb", isBot: false, seat: 1 });
+    expect(state.players[2]).toMatchObject({ id: "bot_1", isBot: true, seat: 2 });
+  });
+
+  it("a departed (left) seat sits out from the next deal", () => {
+    const state = createGameState([
+      { id: "p1", name: "甲", isBot: false },
+      { id: "p2", name: "乙", isBot: false },
+      { id: "p3", name: "丙", isBot: false },
+    ]);
+    state.players[2].left = true;
+    const step = startHand(state);
+    expect(step).toBe("continue");
+    expect(state.players[2].sittingOut).toBe(true);
+    expect(state.players[2].holeCards).toHaveLength(0);
+    // blinds rotate among present players only
+    expect([state.dealerIndex, state.sbIndex, state.bbIndex]).not.toContain(2);
   });
 });
 

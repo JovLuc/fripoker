@@ -1,14 +1,14 @@
-// Hand flow: game state creation (bot fill), dealing, blinds, betting actions,
-// street advancement. All chip movements funnel through commitChips/postBlind.
+// Hand flow: game state creation (seat seeding), dealing, blinds, betting
+// actions, street advancement. All chip movements funnel through
+// commitChips/postBlind.
 
-import { BIG_BLIND, MAX_PLAYERS, SMALL_BLIND, STARTING_CHIPS } from "../../shared/constants.js";
+import { BIG_BLIND, SMALL_BLIND, STARTING_CHIPS } from "../../shared/constants.js";
 import type { LegalActions, PlayerActionName } from "../../shared/protocol.js";
 import { createDeck, shuffle } from "./cards.js";
 import { endHandByFold, showdown } from "./showdown.js";
 import type { ApplyResult, GameState, HandStep, Player } from "./types.js";
 
 const PHASES = ["preflop", "flop", "turn", "river"] as const;
-const BOT_NAMES = ["东", "西", "南", "北", "中"];
 
 function createPlayer(id: string, name: string, isBot: boolean, seat: number): Player {
   return {
@@ -28,6 +28,7 @@ function createPlayer(id: string, name: string, isBot: boolean, seat: number): P
     isBB: false,
     lastAction: null,
     sittingOut: false,
+    left: false,
     debt: 0,
     debtHands: 0,
     bustLogged: false,
@@ -55,14 +56,15 @@ function eligibleIndexes(state: GameState): number[] {
     .filter((i) => i >= 0);
 }
 
-export function createGameState(humanPlayers: { id: string; name: string }[]): GameState {
-  const players = humanPlayers.map((p, i) => createPlayer(p.id, p.name, false, i));
-  let botCount = 0;
-  while (players.length < MAX_PLAYERS) {
-    const seat = players.length;
-    players.push(createPlayer(`bot_${seat}`, BOT_NAMES[botCount % BOT_NAMES.length], true, seat));
-    botCount += 1;
-  }
+/** One seat at table creation; bots are decided by the room, not the engine. */
+export interface SeatSeed {
+  id: string;
+  name: string;
+  isBot: boolean;
+}
+
+export function createGameState(seats: SeatSeed[]): GameState {
+  const players = seats.map((s, i) => createPlayer(s.id, s.name, s.isBot, i));
 
   return {
     handId: 0,
@@ -137,15 +139,15 @@ function resetHand(state: GameState): boolean {
     p.isSB = false;
     p.isBB = false;
     p.lastAction = null;
-    // simple join rule: chips must be > 0 at deal time
-    p.sittingOut = p.chips <= 0;
+    // simple join rule: chips must be > 0 at deal time; departed seats never come back
+    p.sittingOut = p.chips <= 0 || p.left;
   }
 
   const elig = eligibleIndexes(state);
   if (elig.length < 2) {
     state.phase = "idle";
     state.gameOver = true;
-    const left = state.players.filter((p) => p.chips > 0);
+    const left = state.players.filter((p) => p.chips > 0 && !p.left);
     const broke = state.players.filter((p) => p.chips <= 0).map((p) => p.name);
     state.message = left.length
       ? `对局结束 · ${broke.join("、")} 破产 · ${left[0].name} 赢家`

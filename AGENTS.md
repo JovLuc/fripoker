@@ -23,12 +23,12 @@ AI / 新开发者入口文档。**本层只做导航与约定**，细节写进�
 ## 功能地图
 
 - 昵称（localStorage 持久化）
-- 房间：创建 / 加入未开局 / 观战已开局；1–6 真人，不足补机器人到 6；起始 **2000** 币，盲注 **10/20** 固定
+- 房间：创建 / 加入未开局 / 观战已开局；1–10 席（真人 + 机器人），**机器人由房主在房间页增/减**（仅等待中；开局不自动补）；起始 **2000** 币，盲注 **10/20** 固定
 - 一手结束 **不自动开下一手**；**所有有币玩家点「准备」后自动开局**（0 币不能准备，借钱后可以）；破产者观战，≥2 人有币则继续
 - 操作：弃牌 / 过牌·跟注 / 加注 + 滑杆（±10、池比例）；**无操作超时**
 - 断线可重连座位（`playerId` 本地保存）；空房（无人）立刻销毁
 - 房间聊天（可拖按钮 + 四象限展开面板）；河牌左侧「xxx已破产」记录
-- 作弊码：**房间页房主开关，默认开**（状态栏「作弊:开/关」）；开时聊天「爸爸」借 200、「爷爷」借 500、「还钱」还清；刚借完下一手不计息，之后每手 ×1.1（`src/server/cheat/`）
+- 作弊码：**房间页房主开关，默认开**（状态栏「借钱:开/关」，协议仍为 `setCheat`）；开时聊天「爸爸」借 200、「爷爷」借 500、「还钱」还清；刚借完下一手不计息，之后每手 ×1.1（`src/server/cheat/`）
 - 禁右键、禁框选（输入框除外）
 - 路径前缀 `BASE_PATH`（**默认 `/frp`**；设空串回根路径，nginx 反代）
 
@@ -75,6 +75,7 @@ AI / 新开发者入口文档。**本层只做导航与约定**，细节写进�
 - 找「谁发房间快照」→ `src/server/room/serializer.ts` `serializeFor` / `broadcastRoom`
 - 找「比牌/边池/结算」→ `src/server/game/evaluator.ts` `evaluate7` / `showdown.ts` `buildPots` / `showdown`
 - 找「破产观战 / 借贷还钱」→ `src/server/room/gameHost.ts` `afterStep` + `src/server/game/economy.ts`
+- 找「机器人增/减」→ `src/server/room/room.ts` `addRoomBot` / `removeRoomBot`（仅房主、仅 waiting）
 - 找「聊天 / 拖按钮」→ `src/client/components/ChatDock.vue` + `src/client/composables/useChatDock.ts`
 - 找「路径前缀」→ `src/server/net/staticFiles.ts` `pathPrefixes` / `stripBase`
 - 找「连接 / 重连」→ `src/client/api/ws.ts`（客户端）+ `src/server/net/connections.ts`（服务端）

@@ -22,6 +22,7 @@ export function serializeFor(room: Room, viewerId: string): RoomSnapshot {
     hostName: room.hostName,
     cheatEnabled: room.cheatEnabled,
     humanPlayers: room.humanPlayers.map((p) => ({ id: p.id, name: p.name })),
+    botPlayers: room.botPlayers.map((p) => ({ id: p.id, name: p.name })),
     spectators: room.spectators.map((s) => ({ id: s.id, name: s.name })),
     maxPlayers: MAX_PLAYERS,
     chat: room.chat.slice(-CHAT_HISTORY_KEEP),
@@ -35,7 +36,7 @@ export function serializeFor(room: Room, viewerId: string): RoomSnapshot {
   const myLegal: LegalActions | null = legalActionsFor(g, viewerId);
 
   const requiredReady: RequiredReadyPlayer[] = g.players
-    .filter((p) => p.chips > 0)
+    .filter((p) => p.chips > 0 && !p.left)
     .map((p) => ({ id: p.id, name: p.name, isBot: p.isBot, ready: p.isBot || room.readyIds.has(p.id) }));
 
   const players: PlayerView[] = g.players.map((p) => {
@@ -55,6 +56,7 @@ export function serializeFor(room: Room, viewerId: string): RoomSnapshot {
       folded: p.folded,
       allIn: p.allIn,
       sittingOut: p.sittingOut,
+      left: p.left,
       debt: p.debt,
       ready: room.readyIds.has(p.id),
       // seat badge only — history lives in game.busted and is never cleared

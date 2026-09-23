@@ -5,19 +5,18 @@ import { rankOf, suitClass, suitOf } from "../lib/cards.js";
 
 const game = computed(() => room.game);
 
-const messageText = computed(() => {
-  const g = room.game;
-  if (!g) return "";
-  if (g.handOver && g.lastResults && g.lastResults.length) return "";
-  return g.message;
-});
+/** Result lines win over the message whenever the hand just ended. */
+const resultLines = computed(() =>
+  room.game?.handOver && room.game.lastResults ? room.game.lastResults : [],
+);
 </script>
 
 <template>
+  <!-- two sibling bands of the locked column: board | msg -->
   <div class="board-area">
     <div class="board-row">
       <div class="busted-log">
-        <div v-if="bustedList.length" class="busted-title">破产</div>
+        <div v-show="bustedList.length" class="busted-title">破产</div>
         <div v-for="b in bustedList" :key="b.id" class="busted-line">{{ b.name }}已破产</div>
       </div>
       <div class="board">
@@ -33,15 +32,17 @@ const messageText = computed(() => {
       </div>
       <div class="board-side-pad" aria-hidden="true"></div>
     </div>
-    <div class="message-slot">
-      <div class="message">{{ messageText }}</div>
-      <div class="results">
-        <template v-if="game?.lastResults && game.handOver">
-          <div v-for="r in game.lastResults" :key="r.playerId" class="result-line">
-            {{ r.name }} +{{ r.amount }}<span v-if="r.hand"> · {{ r.hand }}</span>
-          </div>
-        </template>
-      </div>
+  </div>
+
+  <!-- one text box: results replace the message by switching its content -->
+  <div class="message-slot">
+    <div class="message">
+      <template v-if="resultLines.length">
+        <span v-for="r in resultLines" :key="r.playerId" class="result-line">
+          {{ r.name }} +{{ r.amount }}<span v-show="r.hand"> · {{ r.hand }}</span>
+        </span>
+      </template>
+      <template v-else>{{ game?.message }}</template>
     </div>
   </div>
 </template>

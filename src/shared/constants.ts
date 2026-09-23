@@ -6,7 +6,7 @@
 export const STARTING_CHIPS = 2000;
 export const SMALL_BLIND = 10;
 export const BIG_BLIND = 20;
-export const MAX_PLAYERS = 6;
+export const MAX_PLAYERS = 10;
 
 /** One「还钱」click pays at most this much (partial repay allowed). */
 export const REPAY_CHIPS = 500;

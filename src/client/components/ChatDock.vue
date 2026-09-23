@@ -28,7 +28,7 @@ import { sendChatText } from "../stores/session.js";
       @mousedown="onChatDragStart"
       @click="onChatToggleClick"
     >
-      聊天<span class="chat-count" aria-hidden="true">{{ chatTotal ? ' ' + chatTotal : '  ' }}</span>
+      聊天<span class="chat-count" aria-hidden="true"> {{ chatTotal }}</span>
     </button>
     <div v-if="chatOpen" class="chat-panel">
       <div id="chat-log" class="chat-log">

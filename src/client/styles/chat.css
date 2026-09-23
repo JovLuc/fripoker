@@ -2,7 +2,8 @@
 
 .chat-dock {
   position: fixed;
-  top: 40px;
+  /* below both room header rows (top bar + status bar) so it never covers them */
+  top: 80px;
   right: 16px;
   z-index: 40;
   display: flex;

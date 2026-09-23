@@ -1,16 +1,27 @@
 <script setup lang="ts">
 import type { PlayerView } from "../../shared/protocol.js";
 import { REPAY_CHIPS } from "../../shared/constants.js";
-import { posLabel, rankOf, suitClass, suitOf } from "../lib/cards.js";
+import { posText, rankOf, suitClass, suitOf } from "../lib/cards.js";
 import { toggleRepay } from "../stores/session.js";
 
 defineProps<{
   p: PlayerView;
   actionPlayerId: string | null;
 }>();
+
+/** One bet slot: amount wins, then the last action's word. Empty hides the text. */
+function betView(p: PlayerView): { text: string; dim: boolean } {
+  if (p.roundBet > 0) return { text: String(p.roundBet), dim: false };
+  if (p.lastAction === "check") return { text: "过牌", dim: false };
+  if (p.lastAction === "fold") return { text: "弃牌", dim: true };
+  if (p.allIn) return { text: "全下", dim: true };
+  if (p.lastAction) return { text: "…", dim: false };
+  return { text: "", dim: false };
+}
 </script>
 
 <template>
+  <!-- every conditional child is v-show: visibility toggles, boxes stay -->
   <div
     class="player"
     :class="{
@@ -22,21 +33,27 @@ defineProps<{
   >
     <div class="player-top">
       <span class="name">{{ p.name }}<template v-if="p.isBot"> ·机</template></span>
-      <span v-if="p.busted" class="pos on bust-tag">破产</span>
-      <span v-else class="pos" :class="{ on: p.isDealer || p.isSB || p.isBB }">{{ posLabel(p) }}</span>
+      <!-- one badge: 离开 / 破产 / position; hidden entirely when empty -->
+      <span v-show="posText(p)" class="pos on" :class="{ 'bust-tag': p.left || p.busted }">{{ posText(p) }}</span>
     </div>
+    <!-- fixed zones: chips / debt / repay each reserve their box, hidden or not -->
     <div class="chips-row">
       <span class="chips">{{ p.chips }}</span>
-      <span v-if="p.debt > 0" class="debt-amt">-{{ p.debt }}</span>
-      <button
-        v-if="p.isMe && p.debt > 0"
-        class="repay-btn"
-        type="button"
-        :disabled="p.chips < Math.min(REPAY_CHIPS, p.debt)"
-        @click="toggleRepay"
-      >还钱</button>
+      <span class="debt-slot">
+        <span v-show="p.debt > 0" class="debt-amt">-{{ p.debt }}</span>
+      </span>
+      <span class="repay-slot">
+        <button
+          v-show="p.isMe && p.debt > 0"
+          class="repay-btn"
+          type="button"
+          :disabled="p.chips < Math.min(REPAY_CHIPS, p.debt)"
+          @click="toggleRepay"
+        >还钱</button>
+      </span>
     </div>
     <div class="cards">
+      <!-- backs render empty rank/suit by contract, no extra condition needed -->
       <div
         v-for="(c, i) in p.holeCards"
         :key="i"
@@ -44,26 +61,17 @@ defineProps<{
         :class="c === 'back' ? 'back' : 'face'"
         :data-code="c === 'back' ? '' : c"
       >
-        <template v-if="c !== 'back'">
-          <span class="rank">{{ rankOf(c) }}</span>
-          <span class="suit" :class="suitClass(c)">{{ suitOf(c) }}</span>
-        </template>
-        <template v-else>
-          <span class="back-mark">·</span>
-        </template>
+        <span class="rank">{{ rankOf(c) }}</span>
+        <span class="suit" :class="suitClass(c)">{{ suitOf(c) }}</span>
       </div>
     </div>
     <div class="bet">
-      <span v-if="p.roundBet > 0">{{ p.roundBet }}</span>
-      <span v-else-if="p.lastAction === 'check'">过牌</span>
-      <span v-else-if="p.lastAction === 'fold'" class="dim">弃牌</span>
-      <span v-else-if="p.allIn" class="dim">全下</span>
-      <span v-else-if="p.lastAction">…</span>
+      <span v-show="betView(p).text" :class="{ dim: betView(p).dim }">{{ betView(p).text }}</span>
     </div>
     <div class="hand-label" :class="{ empty: !p.handLabel }">{{ p.handLabel }}</div>
     <div class="turn-slot" :class="{ on: actionPlayerId === p.id || p.allIn }">
-      <span v-if="p.allIn" class="turn-dot allin">allin</span>
-      <span v-else-if="actionPlayerId === p.id" class="turn-dot">轮到</span>
+      <span v-show="p.allIn" class="turn-dot allin">allin</span>
+      <span v-show="!p.allIn && actionPlayerId === p.id" class="turn-dot">轮到</span>
     </div>
   </div>
 </template>

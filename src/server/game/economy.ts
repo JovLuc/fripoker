@@ -36,8 +36,9 @@ export function noteBusted(state: GameState): { id: string; name: string }[] {
   return added;
 }
 
+/** Funded, present seats — departed (left) players never keep a game alive. */
 export function playersWithChips(state: GameState): Player[] {
-  return state.players.filter((p) => p.chips > 0);
+  return state.players.filter((p) => p.chips > 0 && !p.left);
 }
 
 /**

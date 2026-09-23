@@ -168,8 +168,22 @@ describe("e2e: full room flow", () => {
       name: "测试房",
       status: "waiting",
       humanCount: 2,
+      botCount: 0,
     });
     await lobbyWatcher.close();
+
+    // bot seats: host-only, and remove-before-add errors
+    bob.send({ type: "addBot" });
+    const botErr = await bob.next("error");
+    expect(botErr.payload.message).toBe("只有房主可以调整机器人");
+    alice.send({ type: "removeBot" });
+    const emptyErr = await alice.next("error");
+    expect(emptyErr.payload.message).toBe("没有机器人");
+
+    // host fills 4 bot seats, reflected in the snapshot and the lobby
+    for (let i = 0; i < 4; i++) alice.send({ type: "addBot" });
+    await alice.roomWhere((s) => s.botPlayers.length === 4, 5000, "4 bots seated");
+    expect(alice.lastRoom!.botPlayers.map((b) => b.name)).toEqual(["东", "西", "南", "北"]);
 
     // non-host cannot start
     bob.send({ type: "startGame" });
@@ -188,6 +202,11 @@ describe("e2e: full room flow", () => {
     expect(me.holeCards[0]).not.toBe("back");
     const other = snap.game!.players.find((p) => !p.isMe && !p.isBot)!;
     expect(other.holeCards).toEqual(["back", "back"]);
+
+    // bot seats are frozen once the game runs
+    alice.send({ type: "addBot" });
+    const playingErr = await alice.next("error");
+    expect(playingErr.payload.message).toBe("对局中不能调整机器人");
   });
 
   it("humans fold, bots finish hand 1, chips conserved", async () => {
@@ -283,6 +302,76 @@ describe("e2e: full room flow", () => {
     const snap = await bob2.next("room");
     expect(snap.payload.game!.iAmInGame).toBe(true);
     await bob2.close();
+  });
+
+  it("a lone host must add a bot before starting", async () => {
+    const carol = await TestClient.connect(port);
+    try {
+      carol.send({ type: "setNickname", payload: { nickname: "Carol", playerId: "p_carol" } });
+      await carol.next("profile");
+      carol.send({ type: "createRoom", payload: {} });
+      await carol.next("joined");
+
+      carol.send({ type: "startGame" });
+      const err = await carol.next("error");
+      expect(err.payload.message).toBe("人数不足 · 至少 2 名玩家，可先添加机器人");
+
+      carol.send({ type: "addBot" });
+      await carol.roomWhere((s) => s.botPlayers.length === 1, 5000, "bot seated");
+      carol.send({ type: "startGame" });
+      const snap = await carol.roomWhere(
+        (s) => s.game != null && s.game!.players.length === 2,
+        8000,
+        "1v1 deal",
+      );
+      expect(snap.game!.players.filter((p) => p.isBot)).toHaveLength(1);
+      carol.send({ type: "leaveRoom" });
+    } finally {
+      await carol.close();
+    }
+  });
+
+  it("leaving mid-game folds the leaver at once and sits them out", async () => {
+    const app2 = createServerApp(testConfig());
+    const { port: p2 } = await app2.listen();
+    let h1: TestClient | undefined;
+    let h2: TestClient | undefined;
+    try {
+      h1 = await TestClient.connect(p2);
+      h1.send({ type: "setNickname", payload: { nickname: "H1", playerId: "p_h1" } });
+      await h1.next("profile");
+      h1.send({ type: "createRoom", payload: {} });
+      await h1.next("joined");
+
+      h2 = await TestClient.connect(p2);
+      h2.send({ type: "setNickname", payload: { nickname: "H2", playerId: "p_h2" } });
+      await h2.next("profile");
+      h2.send({ type: "joinRoom", payload: { roomId: h1.lastRoom!.roomId } });
+      await h2.next("joined");
+
+      h1.send({ type: "startGame" });
+      await h2.roomWhere((s) => s.game != null, 5000, "game start");
+
+      h1.send({ type: "leaveRoom" });
+      await h2.roomWhere(
+        (s) => {
+          const p1 = s.game!.players.find((p) => p.id === "p_h1")!;
+          return p1.left && p1.folded;
+        },
+        5000,
+        "h1 marked left+folded",
+      );
+      const snap = h2.lastRoom!;
+      expect(snap.game!.players.find((p) => p.id === "p_h1")!.left).toBe(true);
+      // departed seat is not required to ready the next hand
+      expect(snap.game!.requiredReady.some((r) => r.id === "p_h1")).toBe(false);
+    } finally {
+      const safeClose = (c: TestClient | undefined) =>
+        c && c.ws.readyState !== WebSocket.CLOSED ? c.close() : Promise.resolve();
+      await safeClose(h1);
+      await safeClose(h2);
+      await app2.close();
+    }
   });
 
   it("empty room is destroyed when everyone leaves", async () => {

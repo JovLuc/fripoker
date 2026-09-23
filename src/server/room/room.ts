@@ -13,6 +13,9 @@ export interface SeatPlayer {
   name: string;
 }
 
+/** Display names for host-added bots; one per add, never reused within a room. */
+const BOT_NAMES = ["东", "西", "南", "北", "中", "发", "白", "梅", "兰", "竹", "菊"];
+
 export class Room {
   readonly id: string;
   name: string;
@@ -23,6 +26,8 @@ export class Room {
   cheatEnabled = true;
   readonly createdAt = Date.now();
   humanPlayers: SeatPlayer[];
+  /** Host-added bots; occupy seats like humans once the game starts. */
+  botPlayers: SeatPlayer[] = [];
   spectators: SeatPlayer[] = [];
   /** playerId → conn, seated humans only. */
   readonly sockets = new Map<string, ClientConn>();
@@ -35,6 +40,8 @@ export class Room {
   readyIds = new Set<string>();
   /** The only timer concept in a room: the delayed bot action. */
   botTimer: NodeJS.Timeout | null = null;
+  /** Monotonic bot id source — ids stay unique across add/remove cycles. */
+  botSeq = 0;
 
   constructor(opts: { id: string; name: string; hostId: string; hostName: string }) {
     this.id = opts.id;
@@ -48,8 +55,12 @@ export class Room {
     return this.sockets.size > 0 || this.spectatorSockets.size > 0;
   }
 
+  get seatCount(): number {
+    return this.humanPlayers.length + this.botPlayers.length;
+  }
+
   get hasFreeSeat(): boolean {
-    return this.humanPlayers.length < MAX_PLAYERS;
+    return this.seatCount < MAX_PLAYERS;
   }
 
   clearTimers(): void {
@@ -71,6 +82,26 @@ export class Room {
 // ---------------------------------------------------------------------------
 
 export type JoinResult = { role: "host" | "player" } | { role: "spectator" } | { error: string };
+
+export type BotResult = { ok: true } | { ok: false; error: string };
+
+/** Host adds one bot seat (waiting rooms only). */
+export function addRoomBot(room: Room): BotResult {
+  if (room.status !== "waiting") return { ok: false, error: "对局中不能调整机器人" };
+  if (!room.hasFreeSeat) return { ok: false, error: "房间已满" };
+  room.botSeq += 1;
+  const name = BOT_NAMES[room.botPlayers.length] ?? `机器人${room.botSeq}`;
+  room.botPlayers.push({ id: `bot_${room.botSeq}`, name });
+  return { ok: true };
+}
+
+/** Host drops the most recently added bot (LIFO keeps names unique). */
+export function removeRoomBot(room: Room): BotResult {
+  if (room.status !== "waiting") return { ok: false, error: "对局中不能调整机器人" };
+  if (!room.botPlayers.length) return { ok: false, error: "没有机器人" };
+  room.botPlayers.pop();
+  return { ok: true };
+}
 
 /** Take a seat, reconnect a seated player (renaming), or become a spectator. */
 export function joinRoom(room: Room, playerId: string, playerName: string): JoinResult {

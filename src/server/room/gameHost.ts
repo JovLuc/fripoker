@@ -8,6 +8,7 @@ import type { BotDelay } from "../config.js";
 import {
   applyAction,
   createGameState,
+  endHandByFold,
   noteBusted,
   playersWithChips,
   startHand,
@@ -35,8 +36,12 @@ export class GameHost {
 
   startGame(room: Room): HostResult {
     if (room.status === "playing") return { ok: false, error: "已开局" };
-    if (room.humanPlayers.length < 1) return { ok: false, error: "没有玩家" };
-    room.game = createGameState(room.humanPlayers);
+    const seats = [
+      ...room.humanPlayers.map((p) => ({ id: p.id, name: p.name, isBot: false })),
+      ...room.botPlayers.map((p) => ({ id: p.id, name: p.name, isBot: true })),
+    ];
+    if (seats.length < 2) return { ok: false, error: "人数不足 · 至少 2 名玩家，可先添加机器人" };
+    room.game = createGameState(seats);
     room.status = "playing";
     room.readyIds = new Set();
     const result = startHand(room.game);
@@ -76,6 +81,46 @@ export class GameHost {
     this.events.broadcastRoom(room);
     this.afterStep(room, result);
     return { ok: true };
+  }
+
+  /**
+   * A seated human left a playing room. There is no action timeout, so the
+   * hand must not wait on them: fold them at once (engine-routed when it is
+   * their turn), mark `left` so every future deal sits them out.
+   */
+  handleDeparture(room: Room, playerId: string): void {
+    const g = room.game;
+    if (!g) return;
+    const player = g.players.find((p) => p.id === playerId);
+    if (!player || player.left) return;
+    player.left = true;
+
+    if (g.handOver || player.folded) {
+      this.events.broadcastRoom(room);
+      return;
+    }
+
+    player.folded = true;
+    player.acted = true;
+    player.lastAction = "fold";
+
+    // their turn: route through the engine so the action advances / hand ends
+    if (g.actionIndex >= 0 && g.players[g.actionIndex].id === playerId) {
+      const result = stepAfterAction(g);
+      this.events.broadcastRoom(room);
+      this.afterStep(room, result);
+      return;
+    }
+
+    // not their turn: a silent fold can leave a single contender — end by fold
+    const stillIn = g.players.filter((p) => !p.folded && !p.sittingOut);
+    if (stillIn.length <= 1) {
+      endHandByFold(g);
+      this.events.broadcastRoom(room);
+      this.afterStep(room, "hand-end");
+      return;
+    }
+    this.events.broadcastRoom(room);
   }
 
   private startNextHand(room: Room): HostResult {
@@ -153,7 +198,7 @@ export class GameHost {
 
 function allRequiredReady(room: Room): boolean {
   if (!room.game) return false;
-  const req = room.game.players.filter((p) => p.chips > 0);
+  const req = room.game.players.filter((p) => p.chips > 0 && !p.left);
   if (req.length < 2) return false;
   return req.every((p) => p.isBot || room.readyIds.has(p.id));
 }

@@ -11,7 +11,7 @@ import { createStaticHandler } from "./net/staticFiles.js";
 import { LobbyHub } from "./lobby/lobby.js";
 import { handleRoomChat, playerRepay } from "./room/chat.js";
 import { GameHost } from "./room/gameHost.js";
-import { joinRoom, leaveRoom } from "./room/room.js";
+import { addRoomBot, joinRoom, leaveRoom, removeRoomBot } from "./room/room.js";
 import { RoomRegistry } from "./room/roomManager.js";
 import { broadcastRoom, sendRoomSnapshot } from "./room/serializer.js";
 import type { ServerConfig } from "./config.js";
@@ -88,7 +88,10 @@ export function createServerApp(config: ServerConfig): ServerApp {
     }
     room.spectatorSockets.delete(conn);
     if (conn.playerId) {
-      leaveRoom(registry, room, conn.playerId);
+      const destroyed = leaveRoom(registry, room, conn.playerId);
+      const after = destroyed ? null : registry.get(room.id);
+      // a seated human leaving a live hand folds at once (no timeout to wait for)
+      if (after && after.status === "playing") gameHost.handleDeparture(after, conn.playerId);
     }
 
     const still = registry.get(room.id);
@@ -189,6 +192,26 @@ export function createServerApp(config: ServerConfig): ServerApp {
       case "leaveRoom": {
         leaveAll(conn);
         conn.send({ type: "left" });
+        return;
+      }
+
+      case "addBot":
+      case "removeBot": {
+        const room = conn.roomId ? registry.get(conn.roomId) : null;
+        if (!room) {
+          conn.sendError("不在房间中");
+          return;
+        }
+        if (room.hostId !== conn.playerId) {
+          conn.sendError("只有房主可以调整机器人");
+          return;
+        }
+        const res = msg.type === "addBot" ? addRoomBot(room) : removeRoomBot(room);
+        if (!res.ok) conn.sendError(res.error);
+        else {
+          broadcastRoom(room);
+          roomsChanged();
+        }
         return;
       }
 
@@ -337,6 +360,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       };
     case "listRooms":
     case "leaveRoom":
+    case "addBot":
+    case "removeBot":
     case "startGame":
     case "ready":
     case "repay":

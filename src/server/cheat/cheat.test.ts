@@ -3,7 +3,7 @@ import { createGameState } from "../game/index.js";
 import { tryChatCheat } from "./cheat.js";
 
 function state() {
-  return createGameState([{ id: "p1", name: "甲" }]);
+  return createGameState([{ id: "p1", name: "甲", isBot: false }]);
 }
 
 describe("tryChatCheat (room-level switch, fixed amounts)", () => {

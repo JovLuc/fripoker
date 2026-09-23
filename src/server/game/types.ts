@@ -39,6 +39,8 @@ export interface Player {
   lastAction: LastAction | null;
   /** Busted, or rebought mid-hand — sits out until the next deal. */
   sittingOut: boolean;
+  /** Human left the room; sits out every future hand and cannot act. */
+  left: boolean;
   debt: number;
   /** Hands since last borrow: 0 = just borrowed, next deal charges no interest. */
   debtHands: number;

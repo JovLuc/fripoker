@@ -40,6 +40,7 @@ export class RoomRegistry {
       hostName: room.hostName,
       status: room.status,
       humanCount: room.humanPlayers.length,
+      botCount: room.botPlayers.length,
       maxPlayers: MAX_PLAYERS,
       humanNames: room.humanPlayers.map((p) => p.name),
       createdAt: room.createdAt,

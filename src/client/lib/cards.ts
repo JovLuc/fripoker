@@ -30,3 +30,11 @@ export function posLabel(p: PlayerView | null): string {
   if (p.isBB) return "BB";
   return "";
 }
+
+/** Seat badge text: departure / bust win over the blind position. Empty hides the badge. */
+export function posText(p: PlayerView | null): string {
+  if (!p) return "";
+  if (p.left) return "离开";
+  if (p.busted) return "破产";
+  return posLabel(p);
+}

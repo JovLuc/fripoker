@@ -29,6 +29,8 @@ export interface RoomListItem {
   hostName: string;
   status: RoomStatus;
   humanCount: number;
+  /** Bots the host added on the room page (waiting status only). */
+  botCount: number;
   maxPlayers: number;
   humanNames: string[];
   createdAt: number;
@@ -66,6 +68,8 @@ export interface PlayerView {
   folded: boolean;
   allIn: boolean;
   sittingOut: boolean;
+  /** Seat's human left the room mid-game; sits out from now on. */
+  left: boolean;
   debt: number;
   ready: boolean;
   /** Seat badge only (chips<=0 && !allIn); full history is GameSnapshot.busted. */
@@ -130,6 +134,8 @@ export interface RoomSnapshot {
   /** Chat cheats on? Host toggles this on the room page; default on. */
   cheatEnabled: boolean;
   humanPlayers: { id: string; name: string }[];
+  /** Host-added bots; they take seats like humans once the game starts. */
+  botPlayers: { id: string; name: string }[];
   spectators: { id: string; name: string }[];
   maxPlayers: number;
   chat: ChatMessage[];
@@ -147,6 +153,8 @@ export type ClientMessage =
   | { type: "createRoom"; payload: { name?: string } }
   | { type: "joinRoom"; payload: { roomId: string } }
   | { type: "leaveRoom" }
+  | { type: "addBot" }
+  | { type: "removeBot" }
   | { type: "startGame" }
   | { type: "ready" }
   | { type: "repay" }

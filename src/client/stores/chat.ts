@@ -15,6 +15,14 @@ export function applyChat(list: ChatMessage[], total: number | undefined): void 
   if (chatOpen.value) scrollChatToBottom();
 }
 
+/** Rooms are chat-isolated: drop history when leaving one (next snapshot refills). */
+export function resetChat(): void {
+  chat.value = [];
+  chatTotal.value = 0;
+  chatOpen.value = false;
+  chatInput.value = "";
+}
+
 export function toggleChat(): void {
   chatOpen.value = !chatOpen.value;
   if (chatOpen.value) scrollChatToBottom();

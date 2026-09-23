@@ -38,24 +38,19 @@ async function onCreateRoom(): Promise<void> {
             <div class="room-sub">
               <span>{{ r.status === 'playing' ? '对局中' : '等待中' }}</span>
               <span class="sep">·</span>
-              <span>{{ r.humanCount }}/{{ r.maxPlayers }} 人</span>
+              <span>{{ r.humanCount }}+{{ r.botCount }}机 / {{ r.maxPlayers }} 席</span>
               <span class="sep">·</span>
               <span>{{ (r.humanNames || []).join('、') || '—' }}</span>
             </div>
           </div>
           <div class="room-ops">
             <button
-              v-if="r.status === 'waiting' && r.humanCount < r.maxPlayers"
+              v-if="r.status === 'waiting' && r.humanCount + r.botCount < r.maxPlayers"
               class="btn"
               @click="joinRoomById(r.id)"
             >加入</button>
             <button
-              v-if="r.status === 'playing'"
-              class="btn"
-              @click="joinRoomById(r.id)"
-            >观战</button>
-            <button
-              v-if="r.status === 'waiting' && r.humanCount >= r.maxPlayers"
+              v-else
               class="btn"
               @click="joinRoomById(r.id)"
             >观战</button>
@@ -64,7 +59,7 @@ async function onCreateRoom(): Promise<void> {
       </div>
       <div v-else class="empty">
         <p>暂无房间</p>
-        <p class="dim">创建一个房间，不足 6 人时会自动补机器人</p>
+        <p class="dim">创建一个房间，房主可随时增减机器人凑局</p>
       </div>
     </main>
 

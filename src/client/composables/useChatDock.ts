@@ -7,7 +7,8 @@ import { toggleChat } from "../stores/chat.js";
 
 export type Quadrant = "tr" | "tl" | "br" | "bl";
 
-/** null = default dock position (top-right); {x,y} = dragged pixel position. */
+/** null = default dock position (below the room header, top-right);
+ *  {x,y} = dragged pixel position. */
 export const chatPos = ref<{ x: number; y: number } | null>(loadChatPos());
 export const chatDragging = ref(false);
 export const chatQuadrant = ref<Quadrant>("tr");
@@ -17,11 +18,24 @@ function loadChatPos(): { x: number; y: number } | null {
     const raw = localStorage.getItem(LS_KEYS.chatPos);
     if (!raw) return null;
     const p = JSON.parse(raw) as { x?: unknown; y?: unknown };
-    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) return p as { x: number; y: number };
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+      return clampToViewport(p as { x: number; y: number });
+    }
   } catch {
     /* ignore */
   }
   return null;
+}
+
+/** A saved position can outlive its viewport — pull it back on screen. */
+function clampToViewport(p: { x: number; y: number }): { x: number; y: number } | null {
+  if (typeof window === "undefined") return p;
+  const maxX = window.innerWidth - 80;
+  const maxY = window.innerHeight - 48;
+  if (maxX < 0 || maxY < 0) return null;
+  const x = Math.min(Math.max(0, p.x), maxX);
+  const y = Math.min(Math.max(0, p.y), maxY);
+  return { x: Math.round(x), y: Math.round(y) };
 }
 
 function saveChatPos(p: { x: number; y: number } | null): void {

@@ -8,7 +8,7 @@ import { leaveRoom, setRoomCheat } from "../stores/session.js";
 </script>
 
 <template>
-  <div class="table-screen">
+  <div class="table-screen" :class="{ playing: room.status === 'playing' }">
     <header class="top">
       <button class="btn ghost" @click="leaveRoom">离开</button>
       <div class="brand">{{ room.name }}</div>
@@ -25,12 +25,13 @@ import { leaveRoom, setRoomCheat } from "../stores/session.js";
         class="tag-btn"
         type="button"
         @click="setRoomCheat(!room.cheatEnabled)"
-      >作弊:{{ room.cheatEnabled ? '开' : '关' }}</button>
-      <span v-else-if="room.cheatEnabled" class="tag">作弊</span>
+      >借钱:{{ room.cheatEnabled ? '开' : '关' }}</button>
+      <span v-else-if="room.cheatEnabled" class="tag">借钱</span>
     </div>
 
-    <WaitingRoom v-if="room.status === 'waiting'" />
-    <GameLayout v-else-if="room.game" />
+    <!-- both stay mounted; only visibility toggles (no re-mount reflow) -->
+    <WaitingRoom v-show="room.status === 'waiting'" />
+    <GameLayout v-show="!!room.game" />
 
     <ChatDock />
 
