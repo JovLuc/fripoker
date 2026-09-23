@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GameState } from "../game/index.js";
+import type { Card, GameState, Rank, Suit } from "../game/index.js";
 import { applyAction, createGameState, startHand, stepAfterAction } from "../game/index.js";
 import { botDecide, preflopStrength, shortDeckPreflopStrength } from "./bot.js";
 
@@ -83,5 +83,88 @@ describe("botDecide", () => {
     for (let round = 0; round < 8; round++) {
       expectBotHandAccepted(botTable(true));
     }
+  });
+});
+
+const pc = (rank: Rank, suit: Suit): Card => ({ rank, suit, code: `${rank}${suit.toUpperCase()}` });
+
+/** Stage preflop: one bot on the BB facing a single 3BB raise, rest folded. */
+function faceRaise(hole: [Card, Card]): { state: GameState; botId: string } {
+  const state = createGameState([
+    { id: "h", name: "人", isBot: false },
+    { id: "b1", name: "东", isBot: true },
+    { id: "b2", name: "南", isBot: true },
+  ]);
+  startHand(state);
+  const bb = state.bigBlind || 20;
+  const hero = state.players.find((p) => p.isBot)!;
+  for (const p of state.players) if (p !== hero) p.folded = true;
+  hero.holeCards = hole;
+  hero.roundBet = bb;
+  state.currentBet = 3 * bb;
+  state.lastRaiseSize = 2 * bb;
+  state.pot = 3 * bb + bb + Math.floor(bb / 2);
+  state.actionIndex = state.players.indexOf(hero);
+  return { state, botId: hero.id };
+}
+
+describe("preflop fold discipline (BB vs a single 3BB raise)", () => {
+  const foldRate = (hole: [Card, Card]): number => {
+    const { state, botId } = faceRaise(hole);
+    let folds = 0;
+    for (let i = 0; i < 100; i++) {
+      if (botDecide(state, botId)?.action === "fold") folds++;
+    }
+    return folds / 100;
+  };
+
+  it("premiums never fold", () => {
+    expect(foldRate([pc("A", "h"), pc("A", "d")])).toBe(0);
+  });
+
+  it("broadways mostly defend — the old tables mucked these", () => {
+    expect(foldRate([pc("K", "d"), pc("J", "c")])).toBeLessThan(0.25);
+  });
+
+  it("junk still folds", () => {
+    expect(foldRate([pc("7", "d"), pc("2", "c")])).toBeGreaterThan(0.6);
+  });
+});
+
+/** Stage preflop: first to act, only the blinds in, everyone yet to speak. */
+function faceLimp(hole: [Card, Card]): { state: GameState; botId: string } {
+  const state = createGameState([
+    { id: "h", name: "人", isBot: false },
+    { id: "b1", name: "东", isBot: true },
+    { id: "b2", name: "南", isBot: true },
+  ]);
+  startHand(state);
+  const bb = state.bigBlind || 20;
+  const hero = state.players.find((p) => p.isBot)!;
+  hero.holeCards = hole;
+  hero.roundBet = 0;
+  state.currentBet = bb;
+  state.lastRaiseSize = bb;
+  state.pot = Math.floor(bb * 1.5);
+  state.actionIndex = state.players.indexOf(hero);
+  return { state, botId: hero.id };
+}
+
+describe("preflop limp zone (first orbit, one blind to call)", () => {
+  const foldRate = (hole: [Card, Card]): number => {
+    const { state, botId } = faceLimp(hole);
+    let folds = 0;
+    for (let i = 0; i < 100; i++) {
+      if (botDecide(state, botId)?.action === "fold") folds++;
+    }
+    return folds / 100;
+  };
+
+  it("playable suited connectors mostly limp in", () => {
+    expect(foldRate([pc("7", "s"), pc("6", "s")])).toBeLessThan(0.5);
+  });
+
+  it("rags still fold", () => {
+    expect(foldRate([pc("7", "d"), pc("2", "c")])).toBeGreaterThan(0.6);
   });
 });

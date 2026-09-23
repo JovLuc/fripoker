@@ -30,7 +30,8 @@ game/ 只 import shared —— 零 I/O、零定时器，全部可单测
 | `game/handFlow.ts` | 建局（按 `SeatSeed` 席位种子，**不自动补机器人**）、发牌、盲注、动作合法性、街推进、计息 | `createGameState` `startHand` `applyAction` `stepAfterAction` `legalActions` |
 | `game/showdown.ts` | 边池分层、摊牌结算、弃牌获胜、runout | `buildPots` `awardPots` `showdown` `endHandByFold` |
 | `game/economy.ts` | 借钱/还款/破产登记 | `borrowChips` `repayDebt` `noteBusted` `playersWithChips` |
-| `bot/bot.ts` | 启发式决策（长/短牌各一套翻前牌力表，翻后按模式映射 category）；**返回值经 clampRaise 钳制在合法区间**（旧版会算出非法加注靠重试自愈，已修复） | `botDecide` |
+| `bot/bot.ts` | 决策：全街由 `equity.ts` 蒙特卡洛胜率驱动——跟注看 equity vs 底池赔率（翻前面对真实加注打 1.15 折扣；**limp/补盲便宜行动走牌力表**，因对手未投钱时 potOdds 与多人 equity 错配），加注看 `norm = equity×(对手数+1)`；牌力表另用于翻前开池尺寸；**返回值经 clampRaise 钳制在合法区间** | `botDecide` |
+| `bot/equity.ts` | 纯函数胜率模拟：随机补全对手底牌+剩余公共牌 N 次数胜场（平分计 1/n）；**必须走引擎 `evaluate7`/`compareEval`** 保证与真实结算同一套比牌规则（含短牌重排序）；不读其他玩家真实底牌；`rng` 可注入供测试 | `estimateEquity` |
 | `cheat/cheat.ts` | 作弊触发（精确匹配 爸爸/爷爷/还钱）；**房间级开关 `room.cheatEnabled`**（默认开，房主房间页 `setCheat` 切换），金额固定 200/500/500 | `tryChatCheat` |
 
 ## 生命周期（一局）

@@ -1,13 +1,19 @@
 // Bot heuristics — botDecide(state, playerId) → {action, amount?}.
 // Randomized thresholds keep bots from being trivially exploitable.
+// Strength is a Monte Carlo equity estimate (equity.ts) on every street.
+// Preflop calls discount the raw price (the raiser's range beats random), so
+// bots defend wide against cheap action but still muck trash facing raises;
+// the hand tables survive only for open-bet sizing, where equity vs random
+// is a poor proxy for playability.
 // Invariant tested in bot.test.ts: whatever it returns, applyAction accepts it.
 //
-// Short deck (6+) uses its own preflop table (pairs/big cards dominate the
+// Short deck (6+) uses its own open-size table (pairs/big cards dominate the
 // 36-card deck) and re-maps evaluator categories, which the short-deck
 // evaluate7 already numbers per 6+ ranking. Same decision skeleton otherwise.
 
-import { RANK_VALUE, evaluate7, legalActions } from "../game/index.js";
+import { RANK_VALUE, legalActions } from "../game/index.js";
 import type { Card, GameState, Player } from "../game/index.js";
+import { estimateEquity } from "./equity.js";
 
 export interface BotDecision {
   action: "fold" | "check" | "call" | "raise";
@@ -41,7 +47,9 @@ export function preflopStrength(hole: Card[]): number {
   if (gap <= 1 && hi >= 9) return 0.48;
   if (suited && hi >= 8) return 0.42;
   if (hi >= 12 && lo >= 9) return 0.45;
-  return 0.3;
+  if (suited && gap <= 2) return 0.4;   // small suiteds limp fine
+  if (gap <= 1 && hi >= 6) return 0.38; // small connectors
+  return 0.32;
 }
 
 /**
@@ -77,38 +85,16 @@ export function shortDeckPreflopStrength(hole: Card[]): number {
   return 0.32;
 }
 
-/** Cheap postflop proxy: made-hand category first, high cards fallback. */
-function boardStrength(hole: Card[], board: Card[], shortDeck: boolean): number {
-  const cards = [...hole, ...board];
-  if (cards.length >= 5) {
-    const ev = evaluate7(cards, shortDeck);
-    const pairTail = (): number => {
-      if (ev.category === 2) return 0.7;
-      if (ev.category === 1) {
-        const top = ev.tiebreak[0];
-        if (top >= 12) return 0.6;
-        return 0.5;
-      }
-      const hi = Math.max(...hole.map((c) => RANK_VALUE[c.rank]));
-      if (hi >= 13) return 0.45;
-      return 0.35;
-    };
-    if (shortDeck) {
-      // categories here are 6+ numbered: flush 6 / full house 5 / trips 4 / straight 3
-      if (ev.category >= 6) return 0.9;
-      if (ev.category === 5) return 0.82;
-      if (ev.category === 4) return 0.75;
-      if (ev.category === 3) return 0.65;
-      return pairTail();
-    }
-    if (ev.category >= 3) return 0.9;
-    return pairTail();
-  }
-  return preflopStrengthOf(shortDeck, hole) * 0.5;
-}
-
 function preflopStrengthOf(shortDeck: boolean, hole: Card[]): number {
   return shortDeck ? shortDeckPreflopStrength(hole) : preflopStrength(hole);
+}
+
+/** Players still contesting the pot (dealt in and not folded). All-in
+ *  players count — they can still win. */
+function activeOpponents(state: GameState, playerId: string): number {
+  return state.players.filter(
+    (p) => p.id !== playerId && !p.folded && p.holeCards.length === 2,
+  ).length;
 }
 
 export function botDecide(state: GameState, playerId: string): BotDecision | null {
@@ -120,75 +106,159 @@ function decide(state: GameState, playerId: string): BotDecision | null {
   const idx = state.players.findIndex((p) => p.id === playerId);
   if (idx !== state.actionIndex) return null;
   const player: Player = state.players[idx];
+  const rand = Math.random();
+  const opps = Math.max(1, activeOpponents(state, playerId));
+  const equity = estimateEquity(player.holeCards, state.board, {
+    opponents: opps,
+    shortDeck: state.shortDeck,
+  });
+  return state.phase === "preflop" && state.board.length === 0
+    ? decidePreflop(state, player, equity, opps, rand)
+    : decidePostflop(state, player, equity, opps, rand);
+}
+
+/**
+ * Preflop off sampled equity. The call rule is equity vs the pot-odds price
+ * with a discount (potOdds × 1.15 + 0.03): against the field's random hands
+ * equity overstates a calling range because bettors hold better-than-random
+ * cards, but the raw table scale was worse — it mucked playable hands against
+ * ordinary raises, which read as bots folding far too much. Junk still folds
+ * and shoves get priced correctly; opens (needToCall === 0) stay table-driven.
+ */
+function decidePreflop(
+  state: GameState,
+  player: Player,
+  equity: number,
+  opponents: number,
+  rand: number,
+): BotDecision {
   const needToCall = Math.max(0, state.currentBet - player.roundBet);
   const pot = state.pot;
-  const stack = player.chips;
-  const rand = Math.random();
-  const strength =
-    state.phase === "preflop" && state.board.length === 0
-      ? preflopStrengthOf(state.shortDeck, player.holeCards)
-      : boardStrength(player.holeCards, state.board, state.shortDeck);
-
   const potOdds = needToCall > 0 ? needToCall / (pot + needToCall) : 0;
-  const infl = needToCall / Math.max(1, stack + player.roundBet);
+  const norm = equity * (opponents + 1);
+  const maxTo = player.roundBet + player.chips;
+  const bb = state.bigBlind || 20;
 
-  // always all-in with monsters sometimes
-  if (strength > 0.9 && rand < 0.55) {
-    return { action: "raise", amount: player.roundBet + player.chips };
+  // monsters — jam sometimes so the bots get paid and stay unreadable.
+  // norm threshold is high because multiway equity-vs-random averages 1/(N+1)
+  // — norm 2.3 still means "crushing the field", 1.6 would jam playable hands.
+  if ((equity > 0.82 || norm > 2.3) && rand < 0.32) {
+    return { action: "raise", amount: maxTo };
   }
 
   if (needToCall === 0) {
-    // can check or bet
-    if (strength > 0.72 && rand < 0.75) {
-      const size = Math.min(
-        player.roundBet + player.chips,
-        Math.max(state.bigBlind || 20, Math.floor(pot * (strength > 0.9 ? 0.8 : 0.55))),
-      );
-      const min = state.currentBet === 0 ? state.bigBlind || 20 : state.currentBet + (state.lastRaiseSize || state.bigBlind || 20);
-      const to = Math.max(min, Math.min(size, player.roundBet + player.chips));
-      return { action: "raise", amount: to };
+    // open-betting: tables calibrate sizes better than equity-vs-random
+    const strength = preflopStrengthOf(state.shortDeck, player.holeCards);
+    if (strength > 0.72 && rand < 0.6) {
+      const size = Math.min(maxTo, Math.max(bb, Math.floor(pot * (strength > 0.9 ? 0.7 : 0.5))));
+      const min = state.currentBet === 0 ? bb : state.currentBet + (state.lastRaiseSize || bb);
+      return { action: "raise", amount: Math.max(min, Math.min(size, maxTo)) };
     }
-    if (strength > 0.5 && rand < 0.35) {
-      const min = Math.max(state.bigBlind || 20, Math.floor(pot * 0.4));
-      const to = Math.min(player.roundBet + player.chips, Math.max(state.bigBlind || 20, min));
+    if (strength > 0.5 && rand < 0.3) {
+      const to = Math.min(maxTo, Math.max(bb, Math.floor(pot * 0.4)));
       if (to > state.currentBet) return { action: "raise", amount: to };
     }
     return { action: "check" };
   }
 
-  // facing a bet
-  if (strength >= 0.85 && rand < 0.7) {
-    if (player.roundBet + player.chips > state.currentBet) {
-      const raiseTo = Math.min(
-        player.roundBet + player.chips,
-        state.currentBet + Math.max(state.lastRaiseSize || 20, Math.floor(pot * 0.6)),
-      );
-      if (raiseTo > state.currentBet) return { action: "raise", amount: raiseTo };
-    }
+  // facing a bet: value-raise the top of the range (equity gate for shallow
+  // fields, norm for multiway where raw equity never clears 0.6)
+  if (((equity > 0.6 && opponents <= 2) || norm > 2.0) && rand < 0.5) {
+    const raiseTo = Math.min(
+      maxTo,
+      state.currentBet + Math.max(state.lastRaiseSize || 20, Math.floor(pot * 0.5)),
+    );
+    if (raiseTo > state.currentBet) return { action: "raise", amount: raiseTo };
     return { action: "call" };
   }
 
-  if (strength > potOdds + 0.08 && infl < 0.45) {
-    if (rand < 0.85) return { action: "call" };
+  // cheap action (limp/complete): the field hasn't paid yet, so potOdds on a
+  // one-blind call dwarfs equity computed vs everyone still seated — pricing
+  // it "honestly" folded most of the first orbit. Play any non-junk hand.
+  const infl = needToCall / Math.max(1, player.chips + player.roundBet);
+  if (needToCall <= bb && infl < 0.25) {
+    const strength = preflopStrengthOf(state.shortDeck, player.holeCards);
+    return strength > 0.34 + 0.1 * rand ? { action: "call" } : { action: "fold" };
   }
 
-  if (strength > potOdds + 0.2 && infl < 0.7) {
-    if (rand < 0.7) return { action: "call" };
-  }
-
-  // occasional bluff raise
-  if (strength < 0.4 && rand < 0.08 && player.roundBet + player.chips > state.currentBet + 40) {
-    const raiseTo = Math.min(player.roundBet + player.chips, state.currentBet + Math.max(40, Math.floor(pot * 0.5)));
+  // light 3-bet bluff, more when the price is steep
+  if (equity < 0.45 && rand < 0.04 && maxTo > state.currentBet + 40) {
+    const raiseTo = Math.min(maxTo, state.currentBet + Math.max(40, Math.floor(pot * 0.5)));
     if (raiseTo > state.currentBet) return { action: "raise", amount: raiseTo };
   }
 
-  // facing huge shove
-  if (infl > 0.6 && strength < 0.75) {
-    if (rand < 0.85) return { action: "fold" };
+  // the EV core with a range discount; the margin jitters so sizing gives
+  // nothing away, but a hand that clears it never folds here
+  if (equity > potOdds * 1.15 + 0.03 + 0.04 * rand) {
+    return { action: "call" };
   }
 
-  if (strength > 0.55 && rand < 0.6) return { action: "call" };
-  if (strength > 0.45 && potOdds < 0.2 && rand < 0.5) return { action: "call" };
+  return { action: "fold" };
+}
+
+/**
+ * Postflop decisions off sampled equity. Two principles replace the old magic
+ * thresholds: call iff equity clears the pot-odds price (plus a randomized
+ * margin), and scale aggression by `norm` — equity times the field size, ≈1
+ * meaning exactly an average hand against everyone still in. Multiway pots
+ * therefore tighten on their own, and shoves are priced correctly instead of
+ * folded by a stack-fraction rule.
+ */
+function decidePostflop(
+  state: GameState,
+  player: Player,
+  equity: number,
+  opponents: number,
+  rand: number,
+): BotDecision {
+  const needToCall = Math.max(0, state.currentBet - player.roundBet);
+  const pot = state.pot;
+  const potOdds = needToCall > 0 ? needToCall / (pot + needToCall) : 0;
+  const norm = equity * (opponents + 1);
+  const maxTo = player.roundBet + player.chips;
+  const bb = state.bigBlind || 20;
+
+  // monsters — shove often enough to get paid, not so often as to be readable
+  if ((equity > 0.88 || norm > 2.0) && rand < 0.35) {
+    return { action: "raise", amount: maxTo };
+  }
+
+  if (needToCall === 0) {
+    if (norm > 1.35 && rand < 0.55) {
+      const size = Math.floor(pot * (norm > 1.8 ? 0.7 : 0.5));
+      return { action: "raise", amount: Math.min(maxTo, Math.max(bb, size)) };
+    }
+    if (norm > 1.08 && rand < 0.3) {
+      return { action: "raise", amount: Math.min(maxTo, Math.max(bb, Math.floor(pot * 0.4))) };
+    }
+    // occasional stab with air so checked ranges aren't face-up
+    if (norm < 0.75 && rand < 0.06) {
+      return { action: "raise", amount: Math.min(maxTo, Math.max(bb, Math.floor(pot * 0.5))) };
+    }
+    return { action: "check" };
+  }
+
+  // value raise when well ahead of the field
+  if (norm > 1.6 && rand < 0.45) {
+    const raiseTo = Math.min(
+      maxTo,
+      state.currentBet + Math.max(state.lastRaiseSize || 20, Math.floor(pot * 0.55)),
+    );
+    if (raiseTo > state.currentBet) return { action: "raise", amount: raiseTo };
+    return { action: "call" };
+  }
+
+  // the EV core: call iff equity beats the price; the margin jitters so
+  // sizing gives nothing away, but a hand that clears it never folds here
+  if (equity > potOdds + 0.04 + 0.06 * rand) {
+    return { action: "call" };
+  }
+
+  // rare bluff raise
+  if (norm < 0.8 && rand < 0.05 && maxTo > state.currentBet + 40) {
+    const raiseTo = Math.min(maxTo, state.currentBet + Math.max(40, Math.floor(pot * 0.5)));
+    if (raiseTo > state.currentBet) return { action: "raise", amount: raiseTo };
+  }
 
   return { action: "fold" };
 }
