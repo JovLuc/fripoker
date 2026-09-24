@@ -287,11 +287,44 @@
   min-height: 0;
   display: grid;
   grid-auto-rows: 1fr;
-  grid-template-columns: repeat(var(--seat-cols, 5), minmax(0, 17%));
+  grid-template-columns: repeat(var(--seat-cols, 3), minmax(0, 17%));
   align-content: center;
   justify-content: center;
   column-gap: 10px;
   row-gap: 10px;
+}
+
+/* >2 rows: lock a 2-row window, start at top, scroll the rest.
+   Scrollbar chrome matches .chat-log. */
+.players-row.multi {
+  overflow-y: auto;
+  grid-auto-rows: calc((100% - 10px) / 2);
+  align-content: flex-start;
+  justify-content: center;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  overscroll-behavior: contain;
+}
+
+.players-row.multi::-webkit-scrollbar {
+  width: 6px;
+}
+
+.players-row.multi::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.players-row.multi::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.players-row.multi::-webkit-scrollbar-thumb:hover {
+  background: var(--dim);
+  background-clip: padding-box;
 }
 
 .player {
@@ -372,10 +405,9 @@
   letter-spacing: 0.04em;
 }
 
-/* fixed three zones — debt / repay keep their boxes even when empty */
+/* flex row: chips | debt | repay — all natural width, left-packed */
 .chips-row {
-  display: grid;
-  grid-template-columns: 1fr 46px 46px;
+  display: flex;
   align-items: center;
   gap: 6px;
   min-height: 20px;
@@ -448,21 +480,23 @@
   color: transparent;
 }
 
-.turn-slot {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  min-height: 18px;
-  min-width: 40px;
-}
-
+/* allin / turn badge — same box geometry as .pos (size, padding, border),
+   pinned to the row's right edge */
 .turn-dot {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  margin-left: auto;
   font-size: 10px;
+  line-height: 1.2;
+  padding: 2px 6px;
+  min-width: 28px;
+  min-height: 16px;
   letter-spacing: 0.08em;
   color: var(--white);
   border: 1px solid var(--white);
-  padding: 1px 5px;
 }
 
 .turn-dot.allin {
@@ -508,6 +542,12 @@
   gap: 10px;
   align-items: center;
   justify-content: center;
+}
+
+/* ready button occupies exactly one grid column of .action-row */
+.action-row.ready-row .btn.action {
+  flex: 0 0 auto;
+  width: calc((100% - 20px) / 3);
 }
 
 .btn.action {
@@ -604,17 +644,15 @@
   border-color: var(--white);
 }
 
-/* narrow screens: stack the board row, slim the player cards */
+/* narrow screens: bust log stays pinned left of the board; right pad drops */
 @media (max-width: 560px) {
   .board-row {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    gap: 6px;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
   }
 
   .busted-log {
-    text-align: center;
-    order: -1;
+    text-align: left;
   }
 
   .board-side-pad {
@@ -650,13 +688,7 @@
 
   /* three zones stay reserved but fit ~100–160px cards */
   .chips-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 4px;
-  }
-
-  .debt-slot,
-  .repay-slot {
-    min-width: 36px;
   }
 
   .chips {

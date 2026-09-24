@@ -30,7 +30,7 @@
 - **操作**：`ActionBar` 单槽四态互斥（轮到我 / handOver 准备 / 破产观战 / 等待文案）；三按钮 + 滑杆；预设 1/2·2/3·满池·全下；无倒计时
 - **牌型**：`handLabel` 常驻槽位（服务端 `describeHand` 算好下发）
 - **结算**：有 `lastResults` 时 message 置空，只留横线下列表
-- **破产**：河牌左 `.busted-log`（append-only 史）；座位角标 `players[].busted`；`allIn` 写 `.turn-slot`
+- **破产**：河牌左 `.busted-log`（append-only 史）；座位角标 `players[].busted`；`allIn` 写 `.player-top` 内 `.turn-dot` 角标（与「轮到」共用一个元素，allin 优先）
 - **复活**：中途回归 `sittingOut` → 「已复活 · 本手观战，下一手参战」
 - **借贷**：`.chips-row`「余额 -债务 [还钱]」；按钮发 `repay`（等价聊天「还钱」）
 - **作弊开关（UI 显示为「借钱」）**：`GameView` 状态栏——房主见「借钱:开/关」按钮（发 `setCheat`，协议名不变），非房主仅见「借钱」tag（开时）；默认开

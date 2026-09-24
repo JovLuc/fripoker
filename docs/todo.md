@@ -11,3 +11,4 @@ dist启动脚本
 周报
 robopoker
 poker_solver
+离开后减人数

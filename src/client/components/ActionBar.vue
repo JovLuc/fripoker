@@ -65,8 +65,15 @@ const canReady = computed(() =>
       <span class="dim">{{ readyStatusText }}</span>
       <div class="action-row ready-row">
         <span v-show="readyHint" class="dim">{{ readyHint }}</span>
-        <button v-show="!!mySeat && mySeat.ready" class="btn" type="button" disabled>已准备</button>
-        <button v-show="canReady" class="btn primary" type="button" @click="toggleReady">准备</button>
+        <!-- one button: ready flips label/class/disabled (no second button) -->
+        <button
+          v-show="!!mySeat"
+          class="btn action"
+          :class="{ primary: !!mySeat && !mySeat.ready }"
+          type="button"
+          :disabled="!canReady"
+          @click="toggleReady"
+        >{{ mySeat?.ready ? "已准备" : "准备" }}</button>
       </div>
       <div v-show="room.game?.gameOver" class="action-row">
         <button class="btn" @click="leaveRoom">返回大厅</button>

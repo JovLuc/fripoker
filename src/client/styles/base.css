@@ -27,6 +27,8 @@ body {
   font-family: "SF Mono", "Menlo", "Consolas", "PingFang SC", "Microsoft YaHei", monospace;
   font-size: 14px;
   min-height: 100%;
+  /* disable double-tap zoom (also kills the 300ms tap delay on mobile) */
+  touch-action: manipulation;
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
