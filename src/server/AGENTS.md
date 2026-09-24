@@ -41,7 +41,7 @@ game/ 只 import shared —— 零 I/O、零定时器，全部可单测
 3. 玩家动作：`playerAction` → `applyAction` → `stepAfterAction` → `broadcastRoom` → `afterStep`
 4. 机器人：`afterStep("continue")` → `scheduleBot(700–1300ms)` → `runBotIfNeeded`
 5. `afterStep("hand-end")` → `noteBusted` + **清空 readyIds**；有币者 <2 → `gameOver`；否则等 **所有 chips>0 玩家 ready**（bot 恒 ready）→ `startNextHand` 自动发牌
-6. 断线/离开：`ws.close` 或 `leaveRoom` → `leaveAll` → `leaveRoom` + （playing 房）`gameHost.handleDeparture`：立即代弃（轮到他则走引擎推进，否则静默弃牌、只剩一人则 `endHandByFold`）并标记 `Player.left`——之后每手 `sittingOut`，不参与 ready/续局判定；waiting 房最后一个真人离开即销毁
+6. 断线/离开：`ws.close` 或 `leaveRoom` → `leaveAll` → `leaveRoom` + （playing 房）`gameHost.handleDeparture`：立即代弃（轮到他则走引擎推进，否则静默弃牌、只剩一人则 `endHandByFold`）并标记 `Player.left`——之后每手 `sittingOut`，不参与 ready/续局判定；waiting 房最后一个真人离开即销毁。对局中离开者座位保留（快照 `humanPlayers` 不动、可重连），但大厅列表人数/名字排除 `left` 者（`publicRoomList` 派生）
 
 ## 关键不变量（测试锁死，勿破坏）
 

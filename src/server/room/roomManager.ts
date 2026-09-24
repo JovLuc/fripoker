@@ -34,16 +34,24 @@ export class RoomRegistry {
   }
 
   publicRoomList(): RoomListItem[] {
-    return this.list().map((room) => ({
-      id: room.id,
-      name: room.name,
-      hostName: room.hostName,
-      status: room.status,
-      humanCount: room.humanPlayers.length,
-      botCount: room.botPlayers.length,
-      maxPlayers: MAX_PLAYERS,
-      humanNames: room.humanPlayers.map((p) => p.name),
-      createdAt: room.createdAt,
-    }));
+    return this.list().map((room) => {
+      // 离开者在对局中保留座位供断线重连（快照 humanPlayers 不动），
+      // 但大厅人数不再把他们算进去——以引擎 append-only 的 Player.left 为准。
+      const leftIds = new Set(
+        (room.game?.players ?? []).filter((p) => p.left).map((p) => p.id),
+      );
+      const humans = room.humanPlayers.filter((p) => !leftIds.has(p.id));
+      return {
+        id: room.id,
+        name: room.name,
+        hostName: room.hostName,
+        status: room.status,
+        humanCount: humans.length,
+        botCount: room.botPlayers.length,
+        maxPlayers: MAX_PLAYERS,
+        humanNames: humans.map((p) => p.name),
+        createdAt: room.createdAt,
+      };
+    });
   }
 }

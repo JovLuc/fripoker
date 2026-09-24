@@ -365,6 +365,17 @@ describe("e2e: full room flow", () => {
       expect(snap.game!.players.find((p) => p.id === "p_h1")!.left).toBe(true);
       // departed seat is not required to ready the next hand
       expect(snap.game!.requiredReady.some((r) => r.id === "p_h1")).toBe(false);
+      // seat is kept for reconnect (snapshot), but the lobby count drops them
+      expect(snap.humanPlayers.some((p) => p.id === "p_h1")).toBe(true);
+      const watcher = await TestClient.connect(p2);
+      watcher.send({ type: "listRooms" });
+      const rooms = await watcher.next("rooms");
+      expect(rooms.payload.find((r) => r.id === snap.roomId)).toMatchObject({
+        status: "playing",
+        humanCount: 1,
+        humanNames: ["H2"],
+      });
+      await watcher.close();
     } finally {
       const safeClose = (c: TestClient | undefined) =>
         c && c.ws.readyState !== WebSocket.CLOSED ? c.close() : Promise.resolve();
