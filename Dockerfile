@@ -23,4 +23,4 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 
 EXPOSE 3000
-CMD ["sh", "dist/start.sh"]
+CMD ["node", "dist/server/index.js"]
