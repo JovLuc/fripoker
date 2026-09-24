@@ -8,7 +8,7 @@
 2. 大厅 `screen=lobby`：`LobbyView` 列表 / 创建 / 加入·观战
 3. 房间 `screen=game`：`GameView` → waiting 子视图（`WaitingRoom`）或对局布局（`GameLayout`）+ 浮动 `ChatDock`
 
-连接：`api/ws.ts` 按 `location.pathname` 推导 WS 前缀，**末尾补 `/`** 匹配 nginx `location /frp/`（dev 模式连 `ws://<host>:3000/`）。断线 1.5s 重连；onopen 重发 `setNickname`，有 `fripoker_room` 自动 `joinRoom`，否则 `listRooms`。
+连接：`api/ws.ts` 按 `location.pathname` 推导 WS 前缀，**末尾补 `/`** 匹配 nginx `location /fpk/`（dev 模式连 `ws://<host>:3000/`）。断线 1.5s 重连；onopen 重发 `setNickname`，有 `fripoker_room` 自动 `joinRoom`，否则 `listRooms`。
 
 ## 文件
 

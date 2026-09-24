@@ -23,7 +23,7 @@ export interface ServerConfig {
   botDelay: BotDelay;
 }
 
-/** "" | "/xxx" — accept "frp", "/frp/", "/" etc. */
+/** "" | "/xxx" — accept "fpk", "/fpk/", "/" etc. */
 export function normalizeBase(raw: string): string {
   if (!raw) return "";
   let p = String(raw).trim();
@@ -33,8 +33,8 @@ export function normalizeBase(raw: string): string {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
-  // Unset → /frp (the fixed nginx prefix); BASE_PATH="" opts back to root.
-  const rawBase = env.BASE_PATH === undefined ? "/frp" : env.BASE_PATH;
+  // Unset → /fpk (the fixed nginx prefix); BASE_PATH="" opts back to root.
+  const rawBase = env.BASE_PATH === undefined ? "/fpk" : env.BASE_PATH;
   return {
     port: Number(env.PORT || 3000),
     basePath: normalizeBase(rawBase),

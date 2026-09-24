@@ -16,7 +16,7 @@ game/ 只 import shared —— 零 I/O、零定时器，全部可单测
 |------|------|-----------------|
 | `index.ts` | 进程入口：`loadConfig` → `createServerApp` → listen + LAN 日志 | — |
 | `app.ts` | **组装根**：http+ws 装配、`parseClientMessage`（入站宽容解析）、`routeMessage`（类型化路由）、`leaveAll`（断线/退房清理） | `createServerApp(config)`（测试直接调用） |
-| `config.ts` | 唯一读 env 处：仅 `PORT` / `BASE_PATH`（默认 `/frp`，空串回根）；其余默认全在此收敛 | `loadConfig(env?)` |
+| `config.ts` | 唯一读 env 处：仅 `PORT` / `BASE_PATH`（默认 `/fpk`，空串回根）；其余默认全在此收敛 | `loadConfig(env?)` |
 | `net/staticFiles.ts` | 静态服务：`/fpk` 别名 + BASE_PATH、`stripBase`、`safeJoin` 防穿越、SPA 回退、`no-cache` | `createStaticHandler` |
 | `net/connections.ts` | `ClientConn`：playerId/nickname/roomId 不再挂 ws 上；稳定观战 viewerId；`send/sendError/close` | `ClientConn` |
 | `lobby/lobby.ts` | 大厅 socket 集合 + `rooms` 广播 | `LobbyHub` |
@@ -63,8 +63,8 @@ game/ 只 import shared —— 零 I/O、零定时器，全部可单测
 
 ## 路径前缀
 
-- 唯一前缀来源 `BASE_PATH`（**默认 `/frp`**，空串回根）；裸前缀 302 到带斜杠；未知路径 SPA 回退 `index.html`；`..` 解码后逃逸 root → 403
-- nginx：`location /frp/ { proxy_pass .../frp/; Upgrade/Connection }`；WS 客户端连**带尾斜杠**路径
+- 唯一前缀来源 `BASE_PATH`（**默认 `/fpk`**，空串回根）；裸前缀 302 到带斜杠；未知路径 SPA 回退 `index.html`；`..` 解码后逃逸 root → 403
+- nginx：`location /fpk/ { proxy_pass .../fpk/; Upgrade/Connection }`；WS 客户端连**带尾斜杠**路径
 
 ## 测试
 

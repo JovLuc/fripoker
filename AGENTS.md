@@ -31,7 +31,7 @@ AI / 新开发者入口文档。**本层只做导航与约定**，细节写进�
 - 作弊码：**房间页房主开关，默认开**（状态栏「借钱:开/关」，协议仍为 `setCheat`）；开时聊天「爸爸」借 200、「爷爷」借 500、「还钱」还清；刚借完下一手不计息，之后每手 ×1.1（`src/server/cheat/`）
 - 长短牌：**房间页房主开关（「借钱」旁），默认长牌**（状态栏「牌型:长牌/短牌」，协议 `setShortDeck`）；短牌 6+ = 36 张（≥6）+ **三条>顺子、同花>葫芦** + A 低成顺 A6789；本手结束后才可切换、下一手生效；机器人有对应短牌牌力表（`src/server/bot/`）
 - 禁右键、禁框选（输入框除外）
-- 路径前缀 `BASE_PATH`（**默认 `/frp`**；设空串回根路径，nginx 反代）
+- 路径前缀 `BASE_PATH`（**默认 `/fpk`**；设空串回根路径，nginx 反代）
 
 ## 模块 ↔ 路径
 
@@ -56,7 +56,7 @@ AI / 新开发者入口文档。**本层只做导航与约定**，细节写进�
 - 构建：`npm run build` → `dist/server`（tsc）+ `dist/public`（Vite）+ `dist/start.sh`（从 `scripts/start.sh` 拷入的运行入口，dist 可整体搬迁）；`npm start` = `node dist/server/index.js`
 - `dist/start.sh`：纯启动器（定位自身 + `exec node`），无任何 env 预设
 - 测试 / 类型：`npm test`（vitest，含 e2e）；`npm run typecheck`（tsc + vue-tsc 双零错误）
-- 环境变量只剩两个：`PORT`(3000)、`BASE_PATH`(**默认 `/frp`**，设空串回到无前缀)。HOST 固定 0.0.0.0、静态目录固定在构建产物旁、作弊金额固定 200/500 且开关在房间页——均不可配；所有默认值收敛在 `src/server/config.ts`，`dist/start.sh` 只是纯启动器
+- 环境变量只剩两个：`PORT`(3000)、`BASE_PATH`(**默认 `/fpk`**，设空串回到无前缀)。HOST 固定 0.0.0.0、静态目录固定在构建产物旁、作弊金额固定 200/500 且开关在房间页——均不可配；所有默认值收敛在 `src/server/config.ts`，`dist/start.sh` 只是纯启动器
 - Docker：`docker compose up -d --build`；多阶段（build 阶段编译 + vite，runtime 只装生产依赖并拷 `dist/`）
 - 无数据库；房间仅内存；静态资源 `Cache-Control: no-cache`
 

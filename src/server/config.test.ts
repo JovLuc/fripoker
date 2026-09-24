@@ -5,15 +5,15 @@ describe("loadConfig", () => {
   it("only PORT and BASE_PATH are configurable; sane defaults", () => {
     const cfg = loadConfig({});
     expect(cfg.port).toBe(3000);
-    expect(cfg.basePath).toBe("/frp"); // the fixed nginx prefix
+    expect(cfg.basePath).toBe("/fpk"); // the fixed nginx prefix
     expect(cfg.botDelay).toEqual({ min: 700, max: 1300 });
     expect(cfg.staticRoot).toBeTruthy(); // derived from the compiled location
   });
 
   it("reads PORT and BASE_PATH", () => {
-    const cfg = loadConfig({ PORT: "8080", BASE_PATH: "frp/" });
+    const cfg = loadConfig({ PORT: "8080", BASE_PATH: "fpk/" });
     expect(cfg.port).toBe(8080);
-    expect(cfg.basePath).toBe("/frp");
+    expect(cfg.basePath).toBe("/fpk");
   });
 
   it("BASE_PATH=\"\" opts back to no prefix (root serving)", () => {
@@ -21,9 +21,9 @@ describe("loadConfig", () => {
   });
 
   it("normalizeBase accepts sloppy values", () => {
-    expect(normalizeBase("frp")).toBe("/frp");
-    expect(normalizeBase("/frp/")).toBe("/frp");
-    expect(normalizeBase("/frp//")).toBe("/frp");
+    expect(normalizeBase("fpk")).toBe("/fpk");
+    expect(normalizeBase("/fpk/")).toBe("/fpk");
+    expect(normalizeBase("/fpk//")).toBe("/fpk");
     expect(normalizeBase("/")).toBe("");
     expect(normalizeBase("")).toBe("");
   });
@@ -31,6 +31,6 @@ describe("loadConfig", () => {
   it("ignores removed vars (HOST / STATIC_ROOT / CHEAT_*)", () => {
     const cfg = loadConfig({ HOST: "127.0.0.1", STATIC_ROOT: "/tmp/x", CHEAT_ENABLED: "false" });
     expect(cfg.port).toBe(3000);
-    expect(cfg.basePath).toBe("/frp"); // unaffected default
+    expect(cfg.basePath).toBe("/fpk"); // unaffected default
   });
 });

@@ -19,7 +19,7 @@ function wsUrl(): string {
     return (import.meta.env.VITE_DEV_WS_URL as string | undefined) ?? `ws://${location.hostname}:3000/`;
   }
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  // Directory prefix for reverse proxy (e.g. /frp) — nginx location /frp/
+  // Directory prefix for reverse proxy (e.g. /fpk) — nginx location /fpk/
   // needs the trailing slash.
   let base = location.pathname.replace(/\/index\.html?$/i, "");
   base = base.replace(/\/+$/, "");

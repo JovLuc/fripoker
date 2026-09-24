@@ -4,7 +4,7 @@ services:
     container_name: fripoker
     ports:
       - "3000:3000"
-    # 无需任何环境变量：默认 PORT 3000、BASE_PATH /frp（nginx 固定 /frp/ -> /frp/，
+    # 无需任何环境变量：默认 PORT 3000、BASE_PATH /fpk（nginx 固定 /fpk/ -> /fpk/，
     # 见 src/server/config.ts）。极少用到的前缀改动：加一行 environment:
     #   - BASE_PATH=/xxx   # 设空串 = 无前缀，裸根路径部署
     restart: unless-stopped

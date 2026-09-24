@@ -1,5 +1,5 @@
 // Static file serving behind an optional reverse-proxy path prefix
-// (BASE_PATH, e.g. nginx `location /frp/`).
+// (BASE_PATH, e.g. nginx `location /fpk/`).
 
 import { readFile } from "node:fs/promises";
 import { normalize, join, extname } from "node:path";
@@ -18,7 +18,7 @@ const MIME: Record<string, string> = {
   ".map": "application/json; charset=utf-8",
 };
 
-/** The one accepted prefix (empty → none); nginx proxies e.g. /frp/ → here. */
+/** The one accepted prefix (empty → none); nginx proxies e.g. /fpk/ → here. */
 export function pathPrefixes(basePath: string): string[] {
   return basePath ? [basePath] : [];
 }
