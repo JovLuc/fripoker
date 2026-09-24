@@ -48,7 +48,8 @@
 双向 `{ type, payload? }`，完整类型见 `src/shared/protocol.ts`（`ClientMessage` / `ServerMessage` 可辨识联合）。此处不重复字段表。
 
 - **对战页布局（六行比例带）**：`.table-screen.playing` 锁定 `100dvh` + `overflow:hidden` **整页不滚动**；固定六行 top / status / **board / msg / players / 操作栏**，后四带高度由 flex 比例分配（`game.css`：board 1.6 / msg 0.5 / players 5 / action 2.4），**与游戏状态无关**——任意状态只换盒子里的内容（v-show），绝不推挤兄弟带；窄屏（≤560px）公共牌区纵排、矮屏（≤720px）字号紧凑
-- **玩家卡**：固定 **17% 宽 / 所在行 88% 高**，`justify-content/align-content: center` 紧凑居中 + 10px 固定 gap；列数（每行 3–5）由 `GameLayout` inline 下发；卡内文字行固定高、手牌区 flex:1 自适应（mini 牌 `height:100%` + `aspect-ratio`）
+- **横屏优先响应式**：仍是一套六带 DOM；横屏座位列 17% 宽、每行 3–5；竖屏（`orientation: portrait` 或 ≤480px）`GameLayout` 把 `--seat-cols` 降到 1–3、CSS 改 `1fr` 等宽，chips 三区收窄、操作按钮 ≥44px 触控，status 可换行，safe-area 用 `env(safe-area-inset-*)`；**不要**再拆第二套竖屏组件
+- **玩家卡**：横屏固定 **17% 宽 / 所在行 88% 高**，`justify-content/align-content: center` 紧凑居中 + 10px 固定 gap；列数由 `GameLayout` 下发 CSS 变量 `--seat-cols`（勿 inline 整串 `grid-template-columns`，否则竖屏媒体查询盖不掉）；卡内文字行固定高、手牌区 flex:1 自适应（mini 牌 `height:100%` + `aspect-ratio`）
 - **操作区**：`.action-slot` 单一比例带、**内容顶对齐**，四态（我的回合 / 等待 / 准备 / 破产观战）全部 `v-show` 切换显隐，DOM 常驻不重挂
 - **座位徽标**：单 span `posText(p)`——`离开`（left）/ `破产`（busted）/ D·SB·BB 三态互斥，**空文本整体隐藏**（无空白框）
 - **结算与破产记录**：`.message-slot` 比例带、水平垂直双居中（多余结算行裁剪）；`.busted-log` 与公共牌同带高、`justify-content: flex-end` 滚动隐藏（最新在最下）——位置在公共牌左侧（右对齐），移动端纵排时置顶
@@ -62,4 +63,5 @@
 - [ ] 操作区 / 等待文案切换是否共用 `action-slot`
 - [ ] 聊天展开是否仍不挤占主布局（fixed dock）
 - [ ] 破产记录出现/消失时公共牌是否居中（`.board-row` 三列 + 右垫）
+- [ ] 横竖屏各看一眼：座位列数、chips 不溢出、操作按钮可点（`--seat-cols` + portrait 媒体查询）
 - [ ] `npm run typecheck`（vue-tsc）通过

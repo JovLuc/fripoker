@@ -8,13 +8,18 @@
 
 .lobby-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 32px;
 }
 
 .lobby-actions .room-name {
-  flex: 1;
+  flex: 1 1 180px;
   margin-bottom: 0;
+}
+
+.lobby-actions .btn {
+  flex: 0 0 auto;
 }
 
 .room-list {
@@ -25,12 +30,18 @@
 
 .room-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px 16px;
   border: 1px solid var(--line);
   padding: 16px 18px;
   background: var(--panel);
+}
+
+.room-card .room-meta {
+  flex: 1 1 160px;
+  min-width: 0;
 }
 
 .room-title {

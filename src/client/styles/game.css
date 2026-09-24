@@ -19,9 +19,10 @@
 
 .status-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
+  gap: 8px 12px;
+  padding: 8px max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--line);
   color: var(--dim);
   font-size: 13px;
@@ -120,7 +121,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px 14px 10px;
+  padding: 8px max(14px, env(safe-area-inset-right)) 10px max(14px, env(safe-area-inset-left));
   max-width: 1080px;
   width: 100%;
   margin: 0 auto;
@@ -271,13 +272,22 @@
   white-space: nowrap;
 }
 
+/* portrait / narrow: let long multi-line results breathe instead of clipping */
+@media (orientation: portrait), (max-width: 560px) {
+  .result-line {
+    white-space: normal;
+  }
+}
+
 /* players band: rows split the band evenly (row-gap only); each card fills
-   its row — width is 17% via GameLayout's inline columns */
+   its row — column count from GameLayout (--seat-cols), width defaults 17%
+   landscape; portrait media query switches to equal 1fr columns. */
 .players-row {
   flex: 5 1 0;
   min-height: 0;
   display: grid;
   grid-auto-rows: 1fr;
+  grid-template-columns: repeat(var(--seat-cols, 5), minmax(0, 17%));
   align-content: center;
   justify-content: center;
   column-gap: 10px;
@@ -616,12 +626,106 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Portrait / narrow: same six-band DOM — only column width, chips zones,
+   and touch targets shift. Wide landscape keeps 17% seat columns.
+--------------------------------------------------------------------------- */
+@media (orientation: portrait), (max-width: 480px) {
+  .players-row {
+    /* equal-width cards; count already reduced in GameLayout for portrait */
+    grid-template-columns: repeat(var(--seat-cols, 3), minmax(0, 1fr));
+    width: 100%;
+    max-width: 520px;
+    margin-inline: auto;
+    column-gap: 8px;
+    row-gap: 8px;
+  }
+}
+
+/* chips three-zone fit: portrait phones + landscape phones (17% cards ≈ 100px) */
+@media (orientation: portrait), (max-width: 480px), (max-width: 900px) and (orientation: landscape) {
+  .player {
+    padding: 5px 6px;
+  }
+
+  /* three zones stay reserved but fit ~100–160px cards */
+  .chips-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 4px;
+  }
+
+  .debt-slot,
+  .repay-slot {
+    min-width: 36px;
+  }
+
+  .chips {
+    font-size: 13px;
+  }
+
+  .player-top {
+    font-size: 12px;
+    height: 16px;
+  }
+
+  .player-top .name {
+    max-width: 5.5em;
+  }
+
+  .action-row,
+  .slider-row-inner {
+    max-width: none;
+  }
+
+  .btn.action {
+    min-height: 44px;
+    padding: 12px 8px;
+  }
+
+  .step-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .chip {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .repay-btn {
+    min-height: 28px;
+    padding: 4px 6px;
+  }
+}
+
+/* coarse pointer (phones/tablets even in landscape): bigger hit targets */
+@media (pointer: coarse) {
+  .btn.action {
+    min-height: 40px;
+  }
+
+  .step-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .chip {
+    min-height: 34px;
+  }
+
+  .tag-btn,
+  .repay-btn {
+    min-height: 28px;
+  }
+}
+
 /* short viewports: compact text rows so the proportional cards still keep
    room for the hole cards */
 @media (max-height: 720px) {
   .game-layout {
     gap: 6px;
-    padding: 6px 10px 8px;
+    padding: 6px max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left));
   }
 
   .player-top {

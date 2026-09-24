@@ -2,9 +2,10 @@
 
 .chat-dock {
   position: fixed;
-  /* below both room header rows (top bar + status bar) so it never covers them */
-  top: 80px;
-  right: 16px;
+  /* below both room header rows (top bar + status bar) so it never covers them;
+     +safe-area for notched phones */
+  top: calc(80px + env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -188,4 +189,16 @@
   border-radius: 0;
   padding: 10px 12px;
   font-size: 12px;
+}
+
+/* portrait: status may wrap to two lines — drop the dock a bit; keep it
+   clear of the action band at the bottom */
+@media (orientation: portrait) {
+  .chat-dock:not(.placed) {
+    top: calc(108px + env(safe-area-inset-top, 0px));
+  }
+
+  .chat-log {
+    height: min(220px, 32vh);
+  }
 }

@@ -7,4 +7,4 @@
 set -eu
 export BASE_PATH=/fpk
 export PORT=52006
-exec node "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/server/index.js"
+nohup exec node "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/server/index.js" &> log &
