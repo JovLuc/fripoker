@@ -139,11 +139,18 @@ function decidePreflop(
   const maxTo = player.roundBet + player.chips;
   const bb = state.bigBlind || 20;
 
-  // monsters — jam sometimes so the bots get paid and stay unreadable.
-  // norm threshold is high because multiway equity-vs-random averages 1/(N+1)
-  // — norm 2.3 still means "crushing the field", 1.6 would jam playable hands.
-  if ((equity > 0.82 || norm > 2.3) && rand < 0.32) {
-    return { action: "raise", amount: maxTo };
+  // monsters — pressure the pot but keep all-ins rare: a flat 0.32 jam rate
+  // shipped 200bb stacks in and folded the field out. Deep stacks mostly
+  // overbet-raise (sometimes just call to trap); only a stack already shallow
+  // vs the pot leans on the jam. norm stays high because multiway
+  // equity-vs-random averages 1/(N+1) — 2.3 still means "crushing the field".
+  if (equity > 0.82 || norm > 2.3) {
+    const jam = player.chips <= pot * 2;
+    if (rand < (jam ? 0.22 : 0.08)) return { action: "raise", amount: maxTo };
+    if (rand < 0.5) {
+      const size = Math.min(maxTo, Math.max(bb * 2, Math.floor(pot * 1.2)));
+      if (size > state.currentBet) return { action: "raise", amount: size };
+    }
   }
 
   if (needToCall === 0) {
@@ -218,9 +225,16 @@ function decidePostflop(
   const maxTo = player.roundBet + player.chips;
   const bb = state.bigBlind || 20;
 
-  // monsters — shove often enough to get paid, not so often as to be readable
-  if ((equity > 0.88 || norm > 2.0) && rand < 0.35) {
-    return { action: "raise", amount: maxTo };
+  // monsters — same all-in discipline as preflop: shallow stacks still jam
+  // (pot-committed anyway), deep stacks overbet-raise or slow-play so shoves
+  // stay rare enough that callers need a real hand.
+  if (equity > 0.88 || norm > 2.0) {
+    const jam = player.chips <= pot * 2;
+    if (rand < (jam ? 0.25 : 0.1)) return { action: "raise", amount: maxTo };
+    if (rand < 0.55) {
+      const size = Math.min(maxTo, Math.max(bb * 2, Math.floor(pot * 1.2)));
+      if (size > state.currentBet) return { action: "raise", amount: size };
+    }
   }
 
   if (needToCall === 0) {

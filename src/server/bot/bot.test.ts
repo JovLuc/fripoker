@@ -122,6 +122,18 @@ describe("preflop fold discipline (BB vs a single 3BB raise)", () => {
     expect(foldRate([pc("A", "h"), pc("A", "d")])).toBe(0);
   });
 
+  it("deep-stacked premiums rarely jam — big raise instead", () => {
+    const { state, botId } = faceRaise([pc("A", "h"), pc("A", "d")]);
+    const hero = state.players.find((p) => p.id === botId)!;
+    const allIn = hero.roundBet + hero.chips;
+    let jams = 0;
+    for (let i = 0; i < 200; i++) {
+      const d = botDecide(state, botId);
+      if (d?.action === "raise" && d.amount === allIn) jams++;
+    }
+    expect(jams / 200).toBeLessThan(0.2);
+  });
+
   it("broadways mostly defend — the old tables mucked these", () => {
     expect(foldRate([pc("K", "d"), pc("J", "c")])).toBeLessThan(0.25);
   });
