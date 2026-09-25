@@ -58,7 +58,7 @@ export function updateChatQuadrant(): void {
   chatQuadrant.value = ((bottom ? "b" : "t") + (right ? "r" : "l")) as Quadrant;
 }
 
-/** Suppress the click that follows a drag (mousedown → move → up → click). */
+/** Suppress the click that follows a drag (pointerdown → move → up → click). */
 let dragMoved = false;
 
 export function onChatToggleClick(): void {
@@ -70,7 +70,9 @@ export function onChatToggleClick(): void {
   toggleChat();
 }
 
-export function onChatDragStart(e: MouseEvent): void {
+// Pointer events cover mouse + touch + pen; touch scrolling is already
+// suppressed on the toggle via `touch-action: none`.
+export function onChatDragStart(e: PointerEvent): void {
   if (e.button != null && e.button !== 0) return;
   const target = e.currentTarget as HTMLElement;
   const dock = target.closest(".chat-dock") || target.parentElement!;
@@ -86,7 +88,7 @@ export function onChatDragStart(e: MouseEvent): void {
     h: rect.height,
   };
 
-  const onMove = (ev: MouseEvent) => {
+  const onMove = (ev: PointerEvent) => {
     const dx = ev.clientX - start.mx;
     const dy = ev.clientY - start.my;
     if (!dragMoved && Math.hypot(dx, dy) < 4) return;
@@ -104,11 +106,13 @@ export function onChatDragStart(e: MouseEvent): void {
     if (dragMoved && chatPos.value) saveChatPos(chatPos.value);
     chatDragging.value = false;
     updateChatQuadrant();
-    window.removeEventListener("mousemove", onMove);
-    window.removeEventListener("mouseup", onUp);
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
   };
 
-  window.addEventListener("mousemove", onMove);
-  window.addEventListener("mouseup", onUp);
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
   e.preventDefault();
 }

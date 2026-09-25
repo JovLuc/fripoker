@@ -75,13 +75,14 @@ export const mySeat = computed<PlayerView | null>(() => {
 
 export const bustedList = computed(() => room.game?.busted || []);
 
-/** True bust, or rebought mid-hand (still sitting out until the next deal). */
+/** True bust (server flag chips<=0 && !allIn — a mid-hand all-in is NOT bust),
+ *  or rebought mid-hand (still sitting out until the next deal). */
 export const isBusted = computed(() => {
   if (!room.game || room.status !== "playing") return false;
   if (!profile.playerId) return false;
   const me = room.game.players.find((p) => p.id === profile.playerId);
   if (!me) return false;
-  return me.chips <= 0 || (me.sittingOut && !room.game.handOver);
+  return me.busted || (me.sittingOut && !room.game.handOver);
 });
 
 export const watchLabel = computed(() => {

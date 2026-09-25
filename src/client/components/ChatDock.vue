@@ -25,7 +25,7 @@ import { sendChatText } from "../stores/session.js";
     <button
       class="chat-toggle"
       type="button"
-      @mousedown="onChatDragStart"
+      @pointerdown="onChatDragStart"
       @click="onChatToggleClick"
     >
       聊天<span class="chat-count" aria-hidden="true"> {{ chatTotal }}</span>

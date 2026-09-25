@@ -15,7 +15,6 @@ function betView(p: PlayerView): { text: string; dim: boolean } {
   if (p.roundBet > 0) return { text: String(p.roundBet), dim: false };
   if (p.lastAction === "check") return { text: "过牌", dim: false };
   if (p.lastAction === "fold") return { text: "弃牌", dim: true };
-  if (p.lastAction) return { text: "…", dim: false };
   return { text: "", dim: false };
 }
 </script>
