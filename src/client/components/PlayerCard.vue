@@ -2,6 +2,7 @@
 import type { PlayerView } from "../../shared/protocol.js";
 import { REPAY_CHIPS } from "../../shared/constants.js";
 import { posText, rankOf, suitClass, suitOf } from "../lib/cards.js";
+import { room } from "../stores/room.js";
 import { toggleRepay } from "../stores/session.js";
 
 defineProps<{
@@ -33,13 +34,13 @@ function betView(p: PlayerView): { text: string; dim: boolean } {
     <div class="player-top">
       <span class="name">{{ p.name }}<template v-if="p.isBot"> ·机</template></span>
       <!-- one badge: 离开 / 破产 / position; hidden entirely when empty -->
-      <span v-show="posText(p)" class="pos on" :class="{ 'bust-tag': p.left || p.busted }">{{ posText(p) }}</span>
-      <!-- allin / turn share ONE badge (mutually exclusive; allin wins) -->
+      <span v-show="posText(p, room.kind)" class="pos on" :class="{ 'bust-tag': p.left || p.busted }">{{ posText(p, room.kind) }}</span>
+      <!-- one badge: allin / peeked (turn is the .active border, not a badge) -->
       <span
-        v-show="p.allIn || actionPlayerId === p.id"
+        v-show="p.allIn || p.looked"
         class="turn-dot"
         :class="{ allin: p.allIn }"
-      >{{ p.allIn ? "allin" : "轮到" }}</span>
+      >{{ p.allIn ? "allin" : "看" }}</span>
     </div>
     <!-- fixed zones: chips / debt / repay each reserve their box, hidden or not -->
     <div class="chips-row">
@@ -57,6 +58,7 @@ function betView(p: PlayerView): { text: string; dim: boolean } {
         >还钱</button>
       </span>
     </div>
+    <!-- cards always fan out: hidden = backs, peeked(own)/revealed = faces -->
     <div class="cards">
       <!-- backs render empty rank/suit by contract, no extra condition needed -->
       <div

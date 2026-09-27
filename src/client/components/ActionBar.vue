@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
+import ChoiceDialog from "./ChoiceDialog.vue";
 import { myActionState, mySeat, readyStatusText, role, room, waitingLabel } from "../stores/room.js";
-import { leaveRoom, sendAction, toggleReady } from "../stores/session.js";
+import {
+  leaveRoom,
+  sendAction,
+  sendCompare,
+  sendLook,
+  toggleReady,
+} from "../stores/session.js";
 import { useRaiseSlider } from "../composables/useRaiseSlider.js";
 
 const { raiseTo, raiseMin, raiseMax, raiseLabel, setRaisePreset, stepRaise, sendRaise } = useRaiseSlider();
@@ -11,6 +18,8 @@ const { raiseTo, raiseMin, raiseMax, raiseLabel, setRaisePreset, stepRaise, send
 const mode = computed(() =>
   myActionState.value ? "turn" : room.game?.handOver ? "ready" : "muted",
 );
+
+const isTp = computed(() => room.kind === "tp");
 
 const callLabel = computed(() =>
   myActionState.value?.canCheck ? "过牌" : `跟注${myActionState.value?.needToCall ?? ""}`,
@@ -29,16 +38,85 @@ const readyHint = computed(() =>
 const canReady = computed(() =>
   !!mySeat.value && !mySeat.value.ready && mySeat.value.chips > 0 && role.value !== "spectator",
 );
+
+// --- three-card: peek + open (compare) via dialog ---
+const compareOpen = ref(false);
+
+/** Open targets: peek-state parity with me — blind opens blind, peeked opens peeked. */
+const compareTargets = computed(() => {
+  const me = mySeat.value;
+  if (!me) return [];
+  return (room.game?.players ?? []).filter(
+    (p) => p.inHand && !p.isMe && !p.folded && (p.looked ?? false) === !!me.looked,
+  );
+});
+
+function onLook(): void {
+  compareOpen.value = false;
+  sendLook();
+}
+
+function onOpenClick(): void {
+  if (!myActionState.value?.canCompare) return;
+  compareOpen.value = true;
+}
+
+/** Open costs the bet cost — show it on the button like the bet button does. */
+const openLabel = computed(() => {
+  const fee = myActionState.value?.compareFee;
+  return fee ? `开牌 ${fee}` : "开牌";
+});
+
+/** ChoiceDialog option rows for same-peek-state rivals. */
+const openOptions = computed(() =>
+  compareTargets.value.map((t) => ({ key: t.id, label: t.name, sub: String(t.chips) })),
+);
+
+function doCompare(targetId: string): void {
+  compareOpen.value = false;
+  sendCompare(targetId);
+}
+
+// never carry an open dialog across turns or hands
+// (multi-source form: a getter returning a array would re-fire on every snapshot)
+watch(
+  [() => room.game?.handId ?? 0, () => mode.value],
+  () => {
+    compareOpen.value = false;
+  },
+);
 </script>
 
 <template>
   <div class="action-slot">
     <div v-show="mode === 'turn'" class="action-bar interact">
-      <div class="action-row">
+      <div class="action-row" :class="{ four: isTp }">
         <button class="btn action" @click="sendAction('fold')">弃牌</button>
-        <button class="btn action" @click="sendAction(myActionState?.canCheck ? 'check' : 'call')">{{ callLabel }}</button>
-        <button class="btn action" :disabled="raiseDisabled" @click="sendRaise">{{ raiseLabel }}</button>
+
+        <!-- hold'em: match the street -->
+        <template v-if="!isTp">
+          <button class="btn action" @click="sendAction(myActionState?.canCheck ? 'check' : 'call')">{{ callLabel }}</button>
+          <button class="btn action" :disabled="raiseDisabled" @click="sendRaise">{{ raiseLabel }}</button>
+        </template>
+
+        <!-- three-card: peek (always occupies its column) · slider pay · open -->
+        <template v-else>
+          <button
+            class="btn action"
+            type="button"
+            :disabled="!myActionState?.canLook"
+            @click="onLook"
+          >{{ myActionState?.canLook ? "看牌" : "已看" }}</button>
+          <button class="btn action" :disabled="raiseDisabled" @click="sendRaise">{{ raiseLabel }}</button>
+          <button
+            class="btn action"
+            type="button"
+            :disabled="!myActionState?.canCompare"
+            @click="onOpenClick"
+          >{{ openLabel }}</button>
+        </template>
       </div>
+
       <div class="slider-row">
         <div class="slider-row-inner">
           <button class="step-btn" type="button" aria-label="减10" @click="stepRaise(-10)">−</button>
@@ -83,5 +161,15 @@ const canReady = computed(() =>
     <div v-show="mode === 'muted'" class="action-bar muted">
       <span class="dim">{{ waitingLabel }}</span>
     </div>
+
+    <!-- three-card: pick an open target (same peek state as me) -->
+    <ChoiceDialog
+      v-if="compareOpen && mode === 'turn' && compareTargets.length"
+      :label="myActionState?.compareFee ? `开牌 · 费 ${myActionState.compareFee}` : '开牌'"
+      title="选择对手"
+      :options="openOptions"
+      @choose="doCompare"
+      @cancel="compareOpen = false"
+    />
   </div>
 </template>

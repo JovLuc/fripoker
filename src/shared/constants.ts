@@ -8,6 +8,12 @@ export const SMALL_BLIND = 10;
 export const BIG_BLIND = 20;
 export const MAX_PLAYERS = 10;
 
+// --- three-card (tp) rule constants; shared so room-page copy stays truthful ---
+/** Forced entry every dealt player pays into the pot. */
+export const TP_ANTE = 20;
+/** Initial bet base N; looked players pay 2×N per action. */
+export const TP_BET_STEP = 10;
+
 /** One「还钱」click pays at most this much (partial repay allowed). */
 export const REPAY_CHIPS = 500;
 

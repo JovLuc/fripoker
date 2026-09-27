@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { TP_ANTE } from "../../shared/constants.js";
 import { role, room } from "../stores/room.js";
 import { addRoomBot, removeRoomBot, startGame } from "../stores/session.js";
 
 const seatTotal = computed(() => room.humanPlayers.length + room.botPlayers.length);
 const emptySeats = computed(() => Math.max(0, room.maxPlayers - seatTotal.value));
+const ruleHint = computed(() =>
+  room.kind === "tp"
+    ? `2–${room.maxPlayers} 人可开局 · 底注 ${TP_ANTE} · 每手从 10 起注 · 看牌后翻倍 · 开牌至剩一人`
+    : `2–${room.maxPlayers} 人可开局 · 固定盲注 10/20 · 起始 2000 币 · 破产者观战，剩余继续`,
+);
 </script>
 
 <template>
@@ -30,7 +36,7 @@ const emptySeats = computed(() => Math.max(0, room.maxPlayers - seatTotal.value)
         <button class="btn" type="button" :disabled="!room.botPlayers.length" @click="removeRoomBot">− 机器人</button>
       </div>
       <button v-if="role === 'host'" class="btn primary" @click="startGame">开始对局</button>
-      <p class="dim small">2–{{ room.maxPlayers }} 人可开局 · 固定盲注 10/20 · 起始 2000 币 · 破产者观战，剩余继续</p>
+      <p class="dim small">{{ ruleHint }}</p>
     </div>
   </div>
 </template>

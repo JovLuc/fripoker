@@ -1,18 +1,19 @@
 // Room registry: owns the room map. Replaces the old exported mutable global.
 
 import { MAX_PLAYERS } from "../../shared/constants.js";
-import type { RoomListItem } from "../../shared/protocol.js";
+import type { GameKind, RoomListItem } from "../../shared/protocol.js";
 import { rid } from "../util/id.js";
 import { Room } from "./room.js";
 
 export class RoomRegistry {
   private readonly rooms = new Map<string, Room>();
 
-  create(opts: { name?: string; hostId: string; hostName: string }): Room {
+  create(opts: { name?: string; kind?: GameKind; hostId: string; hostName: string }): Room {
     const id = rid(6).toLowerCase();
     const room = new Room({
       id,
       name: opts.name || `${opts.hostName} 的房间`,
+      kind: opts.kind ?? "holdem",
       hostId: opts.hostId,
       hostName: opts.hostName,
     });
@@ -44,6 +45,7 @@ export class RoomRegistry {
       return {
         id: room.id,
         name: room.name,
+        kind: room.kind,
         hostName: room.hostName,
         status: room.status,
         humanCount: humans.length,

@@ -31,7 +31,7 @@
 
 - **现状**：全员 all-in 后引擎内多处直接 `showdown()`（`handFlow.ts` `advanceAction` / `startNextPhase` / `startHand` 盲注全 all-in 边界），`dealRemainingBoard` 一次发完并结算，一次 broadcast 全亮。
 - **方案**：引擎把"需要 runout"改为返回新 `HandStep` 值（如 `"runout"`）而非就地 showdown；`GameHost.afterStep` 收到后用房间唯一 timer 每 ~800ms 发一条街（flop→turn→river 各 broadcast 一次），发满 5 张再调 `showdown`。引擎其余逻辑不动。
-- **落点**：`src/server/game/types.ts`（HandStep 联合类型）、`src/server/game/handFlow.ts`、`src/server/room/gameHost.ts`（runout 状态机 + 与第 1 项共用 timer）、`src/server/room/room.ts`。
+- **落点**：`src/server/game/core/types.ts`（HandStep 联合类型）、`src/server/game/holdem/handFlow.ts`、`src/server/room/gameHost.ts`（runout 状态机 + 与第 1 项共用 timer）、`src/server/room/room.ts`。
 - **边界**：runout 期间不接受任何 action（`handOver=false` 但 actionIndex=-1 已天然保证）；中途无人可弃牌；`clearTimers` 要覆盖 runout 中的房间（房间销毁路径）。
 - **验收**：测试——全员 all-in 后 board 按 0/3/4/5 渐进到 5 张、最终结算与直接 showdown 逐筹码一致（对照既有结算测试）；与第 1 项共用 timer 不互相打断。
 
@@ -66,20 +66,20 @@
 
 - **方案**：房主开关（等待页，与「牌型」开关并列；协议如 `{ type: "setBlindUp", payload: { enabled } }`）。开启后每 N 手（建议 8）盲注 ×2，封顶 160/320。**陷阱**：`handFlow.ts:182` `postBlind` 用的是常量 `SMALL_BLIND/BIG_BLIND` 而非 `state.smallBlind/bigBlind`，且 `legalActions`/`resetHand` 里多处 `state.bigBlind || BIG_BLIND` 混用常量——本项第一步先把引擎统一改为读 state 字段，再实现递增（这一步独立可测）。
 - **协议改动**：是（开关 + `GameSnapshot` 带下一级预告「第 X 手起 20/40」）。
-- **落点**：`src/shared/protocol.ts`、`src/server/game/handFlow.ts`（resetHand 开头按 handId 调整 state 盲注）、`src/server/app.ts`、`src/server/room/room.ts`（blindUp 标志）、房间页 + 状态栏 UI。
+- **落点**：`src/shared/protocol.ts`、`src/server/game/holdem/handFlow.ts`（resetHand 开头按 handId 调整 state 盲注）、`src/server/app.ts`、`src/server/room/room.ts`（blindUp 标志）、房间页 + 状态栏 UI。
 - **验收**：单测——统一读 state 后既有测试全绿；第 N+1 手盲注翻倍、minRaise 跟随 state.bigBlind。
 
 ### 8. 机器人性格（persona）
 
 - **现状**：11 个 bot 共用同一套阈值 + 随机数，决策同质。
 - **方案**：`bot.ts` 增加 persona 表（按名字映射：紧凶/松弱/跟注站/疯子），实现为对 `decide()` 现有阈值的偏置（紧：equity 门槛 +、open 率 −；跟注站：potOdds 门槛 −、bluff 率≈0；疯子：raise 率 +）。保持 `bot.test.ts` 不变量：任何决策都能被 `applyAction` 接受（`clampRaise` 已兜底）。
-- **落点**：`src/server/bot/bot.ts`（`decide` 加 persona 参数，由 `botDecide(state, playerId)` 查表注入）、`src/server/bot/bot.test.ts`。
+- **落点**：`src/server/game/holdem/bot.ts`（`decide` 加 persona 参数，由 `botDecide(state, playerId)` 查表注入）、`src/server/game/holdem/bot.test.ts`。
 - **验收**：既有测试全绿；可选统计测试——紧 bot 大样本弃牌率显著高于疯子。
 
 ### 9. 机器人聊天
 
 - **方案**：bot 在关键事件以低概率（~15%）通过 `room.appendChat(botId, botName, line)` 发台词：大加注/全下、赢大池（`afterStep` hand-end 时看 `lastResults`）、被 bad beat（输给听牌逆转难判定，简化为"输了大池"）。词库独立文件。遵守 `CHAT_HISTORY_KEEP`/`CHAT_TEXT_MAX` 既有约束。
-- **落点**：新建 `src/server/bot/lines.ts`、`src/server/room/gameHost.ts`（afterStep / runBotIfNeeded 挂钩）。
+- **落点**：新建 `src/server/game/holdem/lines.ts`、`src/server/room/gameHost.ts`（afterStep / runBotIfNeeded 挂钩）。
 - **验收**：手动验证 + 不破坏 chat 上限与广播。
 
 ### 10. 观战者竞猜
@@ -117,3 +117,7 @@
 - `src/server/room/room.ts:96`：bot 显示名按 `botPlayers.length` 取 `BOT_NAMES`，「移除一个再加」会名字复用，与注释 "never reused within a room" 矛盾。改用已有的 `botSeq` 取名（id 已用 `bot_${botSeq}` 保证唯一）。
 - `AGENTS.md` 的「无操作超时」措辞：第 1 项落地后自然吻合；若第 1 项延后，先改文档避免误导。
 - 性能无需担心：`equity.ts` 500 迭代 ×(对手+1) 次 evaluate7，十人桌毫秒级。
+
+
+players固定2行（只有一行的话占1/2高度）
+文档对齐

@@ -5,7 +5,7 @@
 import { existsSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
-import type { ClientMessage, PlayerActionName } from "../shared/protocol.js";
+import type { ClientMessage, GameKind, PlayerActionName } from "../shared/protocol.js";
 import { ClientConn } from "./net/connections.js";
 import { createStaticHandler } from "./net/staticFiles.js";
 import { LobbyHub } from "./lobby/lobby.js";
@@ -137,6 +137,7 @@ export function createServerApp(config: ServerConfig): ServerApp {
         leaveAll(conn);
         const room = registry.create({
           name: msg.payload.name,
+          kind: msg.payload.kind,
           hostId: conn.playerId,
           hostName: conn.nickname,
         });
@@ -276,6 +277,10 @@ export function createServerApp(config: ServerConfig): ServerApp {
           conn.sendError("只有房主可以切换牌型");
           return;
         }
+        if (room.kind !== "holdem") {
+          conn.sendError("该玩法不支持切换牌型");
+          return;
+        }
         if (room.game && !room.game.handOver) {
           conn.sendError("本手进行中，结束后才能切换牌型");
           return;
@@ -291,7 +296,13 @@ export function createServerApp(config: ServerConfig): ServerApp {
           conn.sendError("不在房间中");
           return;
         }
-        const res = gameHost.playerAction(room, conn.playerId, msg.payload.action, msg.payload.amount);
+        const res = gameHost.playerAction(
+          room,
+          conn.playerId,
+          msg.payload.action,
+          msg.payload.amount,
+          msg.payload.targetId,
+        );
         if (!res.ok) conn.sendError(res.error);
         return;
       }
@@ -347,7 +358,11 @@ export function createServerApp(config: ServerConfig): ServerApp {
 // Business rules (empty nickname, illegal amounts…) stay in the handlers.
 // ---------------------------------------------------------------------------
 
-const ACTION_NAMES: readonly PlayerActionName[] = ["fold", "check", "call", "raise", "allin"];
+const ACTION_NAMES: readonly PlayerActionName[] = [
+  "fold", "check", "call", "raise", "allin", "look", "compare",
+];
+
+const GAME_KINDS = ["holdem", "tp"] as const;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined;
@@ -392,7 +407,10 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return { type: "setShortDeck", payload: { enabled: payload?.enabled === true } };
     case "createRoom": {
       const name = str(payload?.name).trim().slice(0, 20);
-      return { type: "createRoom", payload: name ? { name } : {} };
+      const kind = (GAME_KINDS as readonly string[]).includes(String(payload?.kind))
+        ? (payload?.kind as GameKind)
+        : "holdem";
+      return { type: "createRoom", payload: { ...(name ? { name } : {}), kind } };
     }
     case "joinRoom":
       return { type: "joinRoom", payload: { roomId: str(payload?.roomId) } };
@@ -400,11 +418,13 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       const action = str(payload?.action) as PlayerActionName;
       if (!ACTION_NAMES.includes(action)) return null;
       const rawAmount = payload?.amount;
+      const targetId = str(payload?.targetId);
       return {
         type: "action",
         payload: {
           action,
           amount: rawAmount == null ? undefined : Number(rawAmount),
+          ...(targetId ? { targetId } : {}),
         },
       };
     }

@@ -4,8 +4,8 @@
 // line; failures surface only to the sender, the chat line always broadcasts.
 
 import { CHEAT_BORROW_CHIPS, CHEAT_GRANDPA_CHIPS } from "../../shared/constants.js";
-import { borrowChips, repayDebt } from "../game/index.js";
-import type { GameState } from "../game/index.js";
+import { borrowChips, repayDebt } from "../game/core/economy.js";
+import type { BaseGame } from "../game/core/types.js";
 
 export type CheatOutcome =
   | { ok: true; action: "borrow"; chips: number; wasBusted: boolean; debt: number; midHand: boolean; trigger: string }
@@ -20,7 +20,7 @@ export type CheatOutcome =
  * @returns null when the line is not a cheat (or cheats are off) — the caller
  *  then keeps the plain-chat path. Never null for an exact trigger.
  */
-export function tryChatCheat(game: GameState | null, playerId: string, text: string, enabled: boolean): CheatOutcome | null {
+export function tryChatCheat(game: BaseGame | null, playerId: string, text: string, enabled: boolean): CheatOutcome | null {
   if (!enabled || !game) return null;
   const body = String(text || "").trim();
   if (!body) return null;

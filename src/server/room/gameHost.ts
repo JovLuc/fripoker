@@ -1,20 +1,13 @@
 // GameHost: room ↔ engine orchestration — start the game, route player
 // actions, run the ready→deal flow, schedule bots, and broadcast after every
-// step. Owns the room's single timer (bot delay).
+// step. All ruleset knowledge flows through getMode(room.kind); this file
+// never imports a concrete engine. Owns the room's single timer (bot delay).
 
 import type { PlayerActionName } from "../../shared/protocol.js";
-import { botDecide } from "../bot/bot.js";
 import type { BotDelay } from "../config.js";
-import {
-  applyAction,
-  createGameState,
-  endHandByFold,
-  noteBusted,
-  playersWithChips,
-  startHand,
-  stepAfterAction,
-} from "../game/index.js";
-import type { GameState, HandStep } from "../game/index.js";
+import { endGameIfBusted, noteBusted, playersWithChips } from "../game/core/economy.js";
+import type { BaseGame, HandStep } from "../game/core/types.js";
+import { getMode } from "../game/registry.js";
 import type { Room } from "./room.js";
 import type { RoomRegistry } from "./roomManager.js";
 
@@ -36,15 +29,16 @@ export class GameHost {
 
   startGame(room: Room): HostResult {
     if (room.status === "playing") return { ok: false, error: "已开局" };
+    const mode = getMode(room.kind);
     const seats = [
       ...room.humanPlayers.map((p) => ({ id: p.id, name: p.name, isBot: false })),
       ...room.botPlayers.map((p) => ({ id: p.id, name: p.name, isBot: true })),
     ];
     if (seats.length < 2) return { ok: false, error: "人数不足 · 至少 2 名玩家，可先添加机器人" };
-    room.game = createGameState(seats, { shortDeck: room.shortDeck });
+    room.game = mode.create(seats, { shortDeck: room.shortDeck });
     room.status = "playing";
     room.readyIds = new Set();
-    const result = startHand(room.game);
+    const result = mode.startHand(room.game);
     this.events.broadcastRoom(room);
     this.afterStep(room, result);
     return { ok: true };
@@ -67,7 +61,13 @@ export class GameHost {
     return { ok: true, waiting: true };
   }
 
-  playerAction(room: Room, playerId: string, action: PlayerActionName, amount?: number): HostResult {
+  playerAction(
+    room: Room,
+    playerId: string,
+    action: PlayerActionName,
+    amount?: number,
+    targetId?: string,
+  ): HostResult {
     if (room.status !== "playing" || !room.game) return { ok: false, error: "对局未开始" };
     const g = room.game;
     if (g.handOver) return { ok: false, error: "本手已结束" };
@@ -75,9 +75,15 @@ export class GameHost {
     if (idx < 0) return { ok: false, error: "你不在对局中" };
     if (g.actionIndex !== idx) return { ok: false, error: "还没轮到你" };
 
-    const res = applyAction(g, action, amount);
+    const mode = getMode(g.kind);
+    const res = mode.applyAction(g, action, amount, targetId);
     if (!res.ok) return res;
-    const result = stepAfterAction(g);
+    if (res.advance === false) {
+      // applied without consuming the turn (three-card peek) — just publish
+      this.events.broadcastRoom(room);
+      return { ok: true };
+    }
+    const result = mode.stepAfterAction(g);
     this.events.broadcastRoom(room);
     this.afterStep(room, result);
     return { ok: true };
@@ -94,6 +100,7 @@ export class GameHost {
     const player = g.players.find((p) => p.id === playerId);
     if (!player || player.left) return;
     player.left = true;
+    const mode = getMode(g.kind);
 
     if (g.handOver || player.folded) {
       this.events.broadcastRoom(room);
@@ -106,7 +113,7 @@ export class GameHost {
 
     // their turn: route through the engine so the action advances / hand ends
     if (g.actionIndex >= 0 && g.players[g.actionIndex].id === playerId) {
-      const result = stepAfterAction(g);
+      const result = mode.stepAfterAction(g);
       this.events.broadcastRoom(room);
       this.afterStep(room, result);
       return;
@@ -115,7 +122,7 @@ export class GameHost {
     // not their turn: a silent fold can leave a single contender — end by fold
     const stillIn = g.players.filter((p) => !p.folded && !p.sittingOut);
     if (stillIn.length <= 1) {
-      endHandByFold(g);
+      mode.endHandByFold(g);
       this.events.broadcastRoom(room);
       this.afterStep(room, "hand-end");
       return;
@@ -129,7 +136,8 @@ export class GameHost {
     if (!room.game.handOver) return { ok: false, error: "本手尚未结束" };
     if (playersWithChips(room.game).length < 2) return { ok: false, error: "可继续的玩家不足" };
     if (!allRequiredReady(room)) return { ok: false, error: "还有人未准备" };
-    const result = startHand(room.game);
+    const mode = getMode(room.game.kind);
+    const result = mode.startHand(room.game);
     room.readyIds = new Set();
     if (room.game.gameOver) {
       this.events.broadcastRoom(room);
@@ -146,15 +154,8 @@ export class GameHost {
     if (result === "hand-end") {
       // Busts sit out; match continues while ≥2 seats still have chips.
       const added = noteBusted(room.game);
-      const left = playersWithChips(room.game);
       room.readyIds = new Set();
-      if (left.length < 2) {
-        room.game.gameOver = true;
-        room.game.handOver = true;
-        const broke = room.game.players.filter((p) => p.chips <= 0).map((p) => p.name);
-        room.game.message = left.length
-          ? `对局结束 · ${broke.join("、")} 破产 · ${left[0].name} 赢家`
-          : `对局结束 · ${broke.join("、")} 破产`;
+      if (endGameIfBusted(room.game)) {
         this.events.broadcastRoom(room);
         return;
       }
@@ -182,15 +183,22 @@ export class GameHost {
 
   private runBotIfNeeded(room: Room): void {
     if (room.status !== "playing" || !room.game) return;
-    const g: GameState = room.game;
+    const g: BaseGame = room.game;
     if (g.handOver || g.actionIndex < 0) return;
     const actor = g.players[g.actionIndex];
     if (!actor || !actor.isBot) return;
 
-    const decision = botDecide(g, actor.id) || { action: "check" as const };
-    const amount = decision.action === "raise" ? decision.amount : 0;
-    applyAction(g, decision.action, amount);
-    const result = stepAfterAction(g);
+    const mode = getMode(g.kind);
+    const decision = mode.botDecide(g, actor.id) ?? { action: "check" as const };
+    const res = mode.applyAction(g, decision.action, decision.amount, decision.targetId);
+    if (!res.ok) return; // invariant: bot decisions are legal (tested)
+    if (res.advance === false) {
+      // peeked — publish, then let the bot take its real action next tick
+      this.events.broadcastRoom(room);
+      this.scheduleBot(room, this.botDelay.min + Math.floor(Math.random() * (this.botDelay.max - this.botDelay.min)));
+      return;
+    }
+    const result = mode.stepAfterAction(g);
     this.events.broadcastRoom(room);
     this.afterStep(room, result);
   }

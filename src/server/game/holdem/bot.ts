@@ -11,8 +11,10 @@
 // 36-card deck) and re-maps evaluator categories, which the short-deck
 // evaluate7 already numbers per 6+ ranking. Same decision skeleton otherwise.
 
-import { RANK_VALUE, legalActions } from "../game/index.js";
-import type { Card, GameState, Player } from "../game/index.js";
+import { RANK_VALUE } from "../core/cards.js";
+import type { Card } from "../core/types.js";
+import type { GameState, Player } from "./types.js";
+import { legalActions } from "./handFlow.js";
 import { estimateEquity } from "./equity.js";
 
 export interface BotDecision {

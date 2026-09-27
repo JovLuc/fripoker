@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Card, GameState, Rank, Suit } from "../game/index.js";
-import { applyAction, createGameState, startHand, stepAfterAction } from "../game/index.js";
+import type { Card } from "../core/types.js";
+import type { GameState, Rank, Suit } from "./types.js";
+import { applyAction, createGameState, startHand, stepAfterAction } from "./handFlow.js";
 import { botDecide, preflopStrength, shortDeckPreflopStrength } from "./bot.js";
 
 describe("preflopStrength", () => {

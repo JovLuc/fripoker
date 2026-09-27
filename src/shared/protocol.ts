@@ -2,18 +2,34 @@
 // Both directions are `{ type, payload? }`; both sides ship together,
 // so there is no compatibility layer between them.
 //
-// Server-internal types (Card, Player, GameState) live in server/game/types.ts;
+// Server-internal types (Card, player/state shapes) live under server/game/;
 // only what crosses the wire is defined here.
+//
+// Multi-game model: a room picks its GameKind at creation and never changes.
+// GameSnapshot is a discriminated union on `kind` — narrow with
+// `snap.kind === "holdem"` before touching game-specific fields.
+
+/** Playable rulesets. "holdem" = Texas Hold'em, "tp" = three-card (三张牌). */
+export type GameKind = "holdem" | "tp";
 
 export type RoomStatus = "waiting" | "playing";
 
-/** Values must match engine phases; duplicated here so the client never imports server code. */
-export type GamePhase = "idle" | "preflop" | "flop" | "turn" | "river" | "showdown";
+/** Hold'em street. Values must match the engine's phases. */
+export type HoldemPhase = "idle" | "preflop" | "flop" | "turn" | "river" | "showdown";
+
+/** Three-card phases. */
+export type TpPhase = "idle" | "betting" | "showdown";
 
 export type RoomRole = "host" | "player" | "spectator";
 
-/** Player-chosen action names on the wire (raise amount is raise-TO, not a delta). */
-export type PlayerActionName = "fold" | "check" | "call" | "raise" | "allin";
+/**
+ * Player-chosen action names on the wire (raise amount is raise-TO, not a delta).
+ * `look`/`compare` are three-card only — the hold'em engine rejects them.
+ * `look` never consumes the turn (advance: false in the engine result).
+ */
+export type PlayerActionName =
+  | "fold" | "check" | "call" | "raise" | "allin"
+  | "look" | "compare";
 
 export interface ChatMessage {
   id: string;
@@ -26,6 +42,8 @@ export interface ChatMessage {
 export interface RoomListItem {
   id: string;
   name: string;
+  /** Which ruleset this room plays; fixed at creation. */
+  kind: GameKind;
   hostName: string;
   status: RoomStatus;
   humanCount: number;
@@ -38,16 +56,27 @@ export interface RoomListItem {
 
 /** Legal actions for the viewer at this instant; null when not their turn. */
 export interface LegalActions {
+  /** Hold'em: chips to match this street. Three-card: minimum actual payment this action (N blind / 2N peeked). */
   needToCall: number;
   canCheck: boolean;
   canCall: boolean;
+  /** Hold'em raise-to face level. Three-card: min/max ACTUAL payment for this action. */
   minRaiseTo: number;
   maxRaiseTo: number;
   pot: number;
+  /** Current street level (hold'em) / current bet base N (three-card). */
   currentBet: number;
   chips: number;
   roundBet: number;
+  /** Hold'em big blind; three-card fills its bet unit. */
   bigBlind: number;
+  // --- three-card extras (undefined in hold'em snapshots) ---
+  /** Viewer hasn't peeked yet this hand and may still look (their turn only). */
+  canLook?: boolean;
+  /** A rival with the SAME peek state exists and the fee is affordable. */
+  canCompare?: boolean;
+  /** Chips a `compare` action costs: 2 × max(currentBet, unit). */
+  compareFee?: number;
 }
 
 export interface HandResultLine {
@@ -83,6 +112,10 @@ export interface PlayerView {
   holeCards: string[];
   handLabel: string;
   isMe: boolean;
+  /** Three-card: player has peeked this hand — public, and they bet at 2×. */
+  looked?: boolean;
+  /** Three-card: cards were shown to everyone (compare loss or showdown). */
+  revealed?: boolean;
 }
 
 export interface RequiredReadyPlayer {
@@ -97,15 +130,12 @@ export interface BustRecord {
   name: string;
 }
 
-export interface GameSnapshot {
+/** Fields every game snapshot carries. */
+export interface GameSnapshotBase {
   handId: number;
-  phase: GamePhase;
-  /** Card codes; length 0/3/4/5. */
-  board: string[];
   pot: number;
+  /** Current street/round bet level (face value; three-card looked players owe 2×). */
   currentBet: number;
-  smallBlind: number;
-  bigBlind: number;
   message: string;
   handOver: boolean;
   gameOver: boolean;
@@ -117,23 +147,44 @@ export interface GameSnapshot {
   actionPlayerId: string | null;
   actionPlayerName: string | null;
   lastResults: HandResultLine[] | null;
-  /** Showdown happened — all hole cards revealed. */
+  /** Showdown happened — all in-play hole cards revealed. */
   revealAll: boolean;
+  /** Button seat (hold'em D / three-card first-to-act rotation anchor). */
   dealerSeat: number;
   players: PlayerView[];
   myLegal: LegalActions | null;
   iAmInGame: boolean;
 }
 
+export interface HoldemGameSnapshot extends GameSnapshotBase {
+  kind: "holdem";
+  phase: HoldemPhase;
+  /** Card codes; length 0/3/4/5. */
+  board: string[];
+  smallBlind: number;
+  bigBlind: number;
+}
+
+export interface TpGameSnapshot extends GameSnapshotBase {
+  kind: "tp";
+  phase: TpPhase;
+  /** Forced entry chips every dealt player paid. */
+  ante: number;
+}
+
+export type GameSnapshot = HoldemGameSnapshot | TpGameSnapshot;
+
 export interface RoomSnapshot {
   roomId: string;
   name: string;
+  /** Ruleset chosen at creation; drives snapshot narrowing. */
+  kind: GameKind;
   status: RoomStatus;
   hostId: string;
   hostName: string;
   /** Chat cheats on? Host toggles this on the room page; default on. */
   cheatEnabled: boolean;
-  /** Short deck (6+, 36 cards) mode? Host toggles next to the cheat switch; default false = 长牌. */
+  /** Hold'em only: short deck (6+) mode? Host toggles next to the cheat switch; default false = 长牌. */
   shortDeck: boolean;
   humanPlayers: { id: string; name: string }[];
   /** Host-added bots; they take seats like humans once the game starts. */
@@ -152,7 +203,7 @@ export interface RoomSnapshot {
 export type ClientMessage =
   | { type: "setNickname"; payload: { nickname: string; playerId?: string } }
   | { type: "listRooms" }
-  | { type: "createRoom"; payload: { name?: string } }
+  | { type: "createRoom"; payload: { name?: string; kind?: GameKind } }
   | { type: "joinRoom"; payload: { roomId: string } }
   | { type: "leaveRoom" }
   | { type: "addBot" }
@@ -162,7 +213,7 @@ export type ClientMessage =
   | { type: "repay" }
   | { type: "setCheat"; payload: { enabled: boolean } }
   | { type: "setShortDeck"; payload: { enabled: boolean } }
-  | { type: "action"; payload: { action: PlayerActionName; amount?: number } }
+  | { type: "action"; payload: { action: PlayerActionName; amount?: number; targetId?: string } }
   | { type: "chat"; payload: { text: string } }
   | { type: "sync" };
 

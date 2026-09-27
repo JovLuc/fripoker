@@ -1,12 +1,16 @@
 // Hand flow: game state creation (seat seeding), dealing, blinds, betting
-// actions, street advancement. All chip movements funnel through
-// commitChips/postBlind.
+// actions, street advancement. Chip movement funnels through core commitChips.
 
-import { BIG_BLIND, SMALL_BLIND, STARTING_CHIPS } from "../../shared/constants.js";
-import type { LegalActions, PlayerActionName } from "../../shared/protocol.js";
-import { createDeck, shuffle } from "./cards.js";
+import { BIG_BLIND, SMALL_BLIND, STARTING_CHIPS } from "../../../shared/constants.js";
+import type { LegalActions, PlayerActionName } from "../../../shared/protocol.js";
+import { createDeck, shuffle } from "../core/cards.js";
+import { accrueInterest, endGameIfBusted } from "../core/economy.js";
+import { canAct, commitChips, nextSeatFrom, reopenAction } from "../core/flow.js";
+import type { ApplyResult, HandStep, SeatSeed } from "../core/types.js";
 import { endHandByFold, showdown } from "./showdown.js";
-import type { ApplyResult, GameState, HandStep, Player } from "./types.js";
+import type { GameState, Player } from "./types.js";
+
+export { canAct, nextSeatFrom } from "../core/flow.js";
 
 const PHASES = ["preflop", "flop", "turn", "river"] as const;
 
@@ -35,20 +39,6 @@ function createPlayer(id: string, name: string, isBot: boolean, seat: number): P
   };
 }
 
-export function canAct(p: Player): boolean {
-  return !p.folded && !p.allIn && !p.sittingOut && p.chips > 0;
-}
-
-/** First seat clockwise from `from` (exclusive) matching the predicate; -1 if none. */
-export function nextSeatFrom(players: Player[], from: number, predicate: (p: Player, idx: number) => boolean): number {
-  const n = players.length;
-  for (let i = 1; i <= n; i++) {
-    const idx = (from + i + n) % n;
-    if (predicate(players[idx], idx)) return idx;
-  }
-  return -1;
-}
-
 /** Seats dealt in: chips > 0 at deal time (sittingOut is recomputed then). */
 function eligibleIndexes(state: GameState): number[] {
   return state.players
@@ -57,17 +47,14 @@ function eligibleIndexes(state: GameState): number[] {
 }
 
 /** One seat at table creation; bots are decided by the room, not the engine. */
-export interface SeatSeed {
-  id: string;
-  name: string;
-  isBot: boolean;
-}
+export type { SeatSeed } from "../core/types.js";
 
 export function createGameState(seats: SeatSeed[], opts: { shortDeck?: boolean } = {}): GameState {
   const shortDeck = !!opts.shortDeck;
   const players = seats.map((s, i) => createPlayer(s.id, s.name, s.isBot, i));
 
   return {
+    kind: "holdem",
     handId: 0,
     phase: "idle",
     players,
@@ -108,18 +95,7 @@ function postBlind(state: GameState, index: number, amount: number): void {
  * Returns false when fewer than 2 funded seats exist (game over).
  */
 function resetHand(state: GameState): boolean {
-  // Interest: skip the first deal after a fresh borrow (debtHands===0), then ×1.1 each hand.
-  for (const p of state.players) {
-    if (p.debt > 0) {
-      if ((p.debtHands | 0) > 0) {
-        // integer math: ceil(debt * 1.1) without float 1.1 rounding up
-        p.debt = Math.ceil((p.debt * 11) / 10);
-      }
-      p.debtHands = (p.debtHands | 0) + 1;
-    } else {
-      p.debtHands = 0;
-    }
-  }
+  accrueInterest(state.players);
   state.board = [];
   state.deck = shuffle(createDeck(state.shortDeck));
   state.pot = 0;
@@ -148,12 +124,7 @@ function resetHand(state: GameState): boolean {
   const elig = eligibleIndexes(state);
   if (elig.length < 2) {
     state.phase = "idle";
-    state.gameOver = true;
-    const left = state.players.filter((p) => p.chips > 0 && !p.left);
-    const broke = state.players.filter((p) => p.chips <= 0).map((p) => p.name);
-    state.message = left.length
-      ? `对局结束 · ${broke.join("、")} 破产 · ${left[0].name} 赢家`
-      : `对局结束 · ${broke.join("、")} 破产`;
+    endGameIfBusted(state);
     return false;
   }
 
@@ -242,22 +213,6 @@ export function legalActionsFor(state: GameState, playerId: string): LegalAction
   const idx = state.players.findIndex((p) => p.id === playerId);
   if (idx < 0 || idx !== state.actionIndex) return null;
   return legalActions(state);
-}
-
-function commitChips(state: GameState, player: Player, amount: number): number {
-  const pay = Math.min(Math.floor(amount), player.chips);
-  player.chips -= pay;
-  player.roundBet += pay;
-  player.totalBet += pay;
-  state.pot += pay;
-  if (player.chips === 0) player.allIn = true;
-  return pay;
-}
-
-function reopenAction(state: GameState, aggressor: Player): void {
-  for (const p of state.players) {
-    if (p !== aggressor && canAct(p)) p.acted = false;
-  }
 }
 
 /**

@@ -8,8 +8,9 @@
 // Cost: iterations × (opponents+1) evaluate7 calls — a few ms per decision;
 // bot actions ride on timers, so it is imperceptible.
 
-import { compareEval, createDeck, evaluate7 } from "../game/index.js";
-import type { Card } from "../game/index.js";
+import { compareEval, evaluate7 } from "./evaluator.js";
+import { createDeck } from "../core/cards.js";
+import type { Card } from "../core/types.js";
 
 export type Rng = () => number;
 

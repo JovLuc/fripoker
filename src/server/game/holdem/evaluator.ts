@@ -6,7 +6,7 @@
 // straight. Both hands of a comparison are always evaluated in the same mode,
 // so compareEval stays a plain category/tiebreak comparison.
 
-import { RANK_VALUE } from "./cards.js";
+import { RANK_VALUE } from "../core/cards.js";
 import type { Card } from "./types.js";
 
 export interface HandEval {

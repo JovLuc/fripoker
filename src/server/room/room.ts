@@ -3,8 +3,8 @@
 // ready-flow state lives here so the engine stays pure.
 
 import { CHAT_HISTORY_KEEP, CHAT_TEXT_MAX, MAX_PLAYERS } from "../../shared/constants.js";
-import type { ChatMessage, RoomStatus } from "../../shared/protocol.js";
-import type { GameState } from "../game/index.js";
+import type { ChatMessage, GameKind, RoomStatus } from "../../shared/protocol.js";
+import type { BaseGame } from "../game/core/types.js";
 import type { ClientConn } from "../net/connections.js";
 import { rid } from "../util/id.js";
 
@@ -19,13 +19,15 @@ const BOT_NAMES = ["东", "西", "南", "北", "中", "发", "白", "梅", "兰"
 export class Room {
   readonly id: string;
   name: string;
+  /** Ruleset chosen at creation; never changes for the room's lifetime. */
+  readonly kind: GameKind;
   hostId: string;
   hostName: string;
   status: RoomStatus = "waiting";
   /** Chat cheats on? Host toggles from the room page; default on. */
   cheatEnabled = true;
-  /** Short deck (6+) mode? Host toggles from the room page; default off = 长牌.
-   *  Applies from the next deal — mid-hand switching is rejected in app.ts. */
+  /** Hold'em only: short deck (6+) mode? Host toggles from the room page;
+   *  default off = 长牌. Applies from the next deal. */
   shortDeck = false;
   readonly createdAt = Date.now();
   humanPlayers: SeatPlayer[];
@@ -35,7 +37,7 @@ export class Room {
   /** playerId → conn, seated humans only. */
   readonly sockets = new Map<string, ClientConn>();
   readonly spectatorSockets = new Set<ClientConn>();
-  game: GameState | null = null;
+  game: BaseGame | null = null;
   chat: ChatMessage[] = [];
   /** Total messages ever (chat[] keeps only the last CHAT_HISTORY_KEEP). */
   chatTotal = 0;
@@ -46,9 +48,10 @@ export class Room {
   /** Monotonic bot id source — ids stay unique across add/remove cycles. */
   botSeq = 0;
 
-  constructor(opts: { id: string; name: string; hostId: string; hostName: string }) {
+  constructor(opts: { id: string; name: string; kind: GameKind; hostId: string; hostName: string }) {
     this.id = opts.id;
     this.name = opts.name;
+    this.kind = opts.kind;
     this.hostId = opts.hostId;
     this.hostName = opts.hostName;
     this.humanPlayers = [{ id: opts.hostId, name: opts.hostName }];

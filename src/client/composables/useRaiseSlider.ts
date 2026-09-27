@@ -41,6 +41,7 @@ export function useRaiseSlider() {
   const raiseLabel = computed(() => {
     if (!myActionState.value) return "加注";
     if (raiseTo.value >= raiseMax.value) return `全下 ${raiseMax.value}`;
+    if (room.kind === "tp") return `下注 ${raiseTo.value}`; // payment semantics
     if (myActionState.value.currentBet === 0) return `下注 ${raiseTo.value}`;
     return `加注到 ${raiseTo.value}`;
   });
@@ -50,7 +51,10 @@ export function useRaiseSlider() {
     const st = myActionState.value;
     const potPart = Math.floor(st.pot * frac);
     let to: number;
-    if (st.currentBet === 0) {
+    if (room.kind === "tp") {
+      // three-card slider holds an actual payment, not a face level
+      to = Math.max(st.minRaiseTo, potPart);
+    } else if (st.currentBet === 0) {
       to = st.roundBet + Math.max(st.minRaiseTo - st.roundBet, potPart);
     } else {
       to = st.currentBet + Math.max(st.minRaiseTo - st.currentBet, potPart);

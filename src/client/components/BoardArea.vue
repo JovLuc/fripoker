@@ -9,6 +9,9 @@ const game = computed(() => room.game);
 const resultLines = computed(() =>
   room.game?.handOver && room.game.lastResults ? room.game.lastResults : [],
 );
+
+/** Hold'em narrows to the street snapshot; three-card renders an empty board. */
+const holdem = computed(() => (room.game?.kind === "holdem" ? room.game : null));
 </script>
 
 <template>
@@ -19,16 +22,19 @@ const resultLines = computed(() =>
         <div v-show="bustedList.length" class="busted-title">破产</div>
         <div v-for="b in bustedList" :key="b.id" class="busted-line">{{ b.name }}已破产</div>
       </div>
+      <!-- hold'em: five community slots; three-card: nothing (band stays reserved) -->
       <div class="board">
-        <div v-for="(c, i) in game?.board ?? []" :key="i" class="card face">
-          <span class="rank">{{ rankOf(c) }}</span>
-          <span class="suit" :class="suitClass(c)">{{ suitOf(c) }}</span>
-        </div>
-        <div
-          v-for="i in Math.max(0, 5 - (game?.board.length ?? 0))"
-          :key="'ph' + i"
-          class="card slot"
-        ></div>
+        <template v-if="holdem">
+          <div v-for="(c, i) in holdem.board" :key="i" class="card face">
+            <span class="rank">{{ rankOf(c) }}</span>
+            <span class="suit" :class="suitClass(c)">{{ suitOf(c) }}</span>
+          </div>
+          <div
+            v-for="i in Math.max(0, 5 - holdem.board.length)"
+            :key="'ph' + i"
+            class="card slot"
+          ></div>
+        </template>
       </div>
       <div class="board-side-pad" aria-hidden="true"></div>
     </div>

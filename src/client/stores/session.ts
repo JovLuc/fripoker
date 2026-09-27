@@ -3,7 +3,7 @@
 // initSession() returns a disposer so App.vue can clean up on unmount.
 
 import { LS_KEYS } from "../../shared/constants.js";
-import type { PlayerActionName, ServerMessage } from "../../shared/protocol.js";
+import type { GameKind, PlayerActionName, ServerMessage } from "../../shared/protocol.js";
 import { ws } from "../api/ws.js";
 import { rooms } from "./lobby.js";
 import { chatInput } from "./chat.js";
@@ -133,11 +133,11 @@ async function ensureProfile(): Promise<void> {
   }
 }
 
-export async function createRoom(name: string): Promise<void> {
+export async function createRoom(name: string, kind: GameKind = "holdem"): Promise<void> {
   clearError();
   try {
     await ensureProfile();
-    ws.send({ type: "createRoom", payload: name ? { name } : {} });
+    ws.send({ type: "createRoom", payload: { ...(name ? { name } : {}), kind } });
   } catch {
     /* error already shown */
   }
@@ -193,6 +193,18 @@ export function setRoomShortDeck(enabled: boolean): void {
 
 export function sendAction(action: PlayerActionName): void {
   ws.send({ type: "action", payload: { action } });
+  clearError();
+}
+
+/** Three-card: peek at own cards — free, does not consume the turn. */
+export function sendLook(): void {
+  ws.send({ type: "action", payload: { action: "look" } });
+  clearError();
+}
+
+/** Three-card: pay the fee and duel `targetId`; loser folds and is revealed. */
+export function sendCompare(targetId: string): void {
+  ws.send({ type: "action", payload: { action: "compare", targetId } });
   clearError();
 }
 

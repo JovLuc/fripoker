@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { REPAY_CHIPS } from "../../shared/constants.js";
-import { createGameState, startHand } from "./handFlow.js";
+import { REPAY_CHIPS } from "../../../shared/constants.js";
+import { createGameState, startHand } from "../holdem/handFlow.js";
 import { borrowChips, noteBusted, playersWithChips, repayDebt } from "./economy.js";
 
 function state1() {

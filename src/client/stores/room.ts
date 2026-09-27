@@ -2,7 +2,13 @@
 // One applySnapshot entry point; role derivation lives in exactly one place.
 
 import { computed, reactive, ref } from "vue";
-import type { GameSnapshot, PlayerView, RoomRole, RoomSnapshot } from "../../shared/protocol.js";
+import type {
+  GameKind,
+  GameSnapshot,
+  PlayerView,
+  RoomRole,
+  RoomSnapshot,
+} from "../../shared/protocol.js";
 import { applyChat, resetChat } from "./chat.js";
 import { profile } from "./profile.js";
 
@@ -15,6 +21,7 @@ export const role = ref<Role>("player");
 export const room = reactive({
   id: "",
   name: "",
+  kind: "holdem" as GameKind,
   status: "waiting" as RoomSnapshot["status"],
   hostId: "",
   hostName: "",
@@ -30,6 +37,7 @@ export const room = reactive({
 export function applyRoomSnapshot(snap: RoomSnapshot): void {
   room.id = snap.roomId;
   room.name = snap.name;
+  room.kind = snap.kind;
   room.status = snap.status;
   room.hostId = snap.hostId;
   room.hostName = snap.hostName;
@@ -57,6 +65,7 @@ function deriveRole(): void {
 export function resetRoomState(): void {
   room.game = null;
   room.id = "";
+  room.kind = "holdem";
   room.status = "waiting";
   room.cheatEnabled = true;
   room.shortDeck = false;
@@ -123,8 +132,16 @@ const PHASE_LABELS: Record<string, string> = {
   idle: "等待",
 };
 
+const TP_PHASE_LABELS: Record<string, string> = {
+  betting: "下注",
+  showdown: "开牌",
+  idle: "等待",
+};
+
 export const phaseLabel = computed(() => {
-  if (!room.game) return "";
-  if (room.game.gameOver) return "结束";
-  return PHASE_LABELS[room.game.phase] || room.game.phase;
+  const g = room.game;
+  if (!g) return "";
+  if (g.gameOver) return "结束";
+  if (g.kind === "tp") return TP_PHASE_LABELS[g.phase] || g.phase;
+  return PHASE_LABELS[g.phase] || g.phase;
 });

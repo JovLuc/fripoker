@@ -193,3 +193,26 @@ input {
   align-items: center;
   gap: 12px;
 }
+
+/* --- modal dialog shell — reused by lobby pickers and in-game popups --- */
+.dialog-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 40;
+}
+
+.dialog-mask .panel {
+  width: min(320px, calc(100vw - 48px));
+}
+
+.dialog-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}

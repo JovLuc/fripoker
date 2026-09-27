@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Card, Rank, Suit } from "../game/index.js";
+import type { Card, Rank, Suit } from "../core/types.js";
 import { estimateEquity } from "./equity.js";
 
 /** mulberry32 — small seeded PRNG so the distribution assertions are stable. */

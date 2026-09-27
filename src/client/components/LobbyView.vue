@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import type { GameKind } from "../../shared/protocol.js";
+import ChoiceDialog, { type DialogOption } from "./ChoiceDialog.vue";
 import { error } from "../stores/error.js";
 import { rooms } from "../stores/lobby.js";
 import { profile } from "../stores/profile.js";
@@ -7,10 +9,26 @@ import { clearNickname } from "../stores/profile.js";
 import { createRoom, joinRoomById } from "../stores/session.js";
 
 const roomName = ref("");
+const pickOpen = ref(false);
 
-async function onCreateRoom(): Promise<void> {
-  await createRoom(roomName.value.trim());
+const kindOptions: DialogOption[] = [
+  { key: "holdem", label: "德州扑克" },
+  { key: "tp", label: "三张牌" },
+];
+
+function onCreateClick(): void {
+  pickOpen.value = true;
+}
+
+async function onPickKind(key: string): Promise<void> {
+  pickOpen.value = false;
+  const kind: GameKind = key === "tp" ? "tp" : "holdem";
+  await createRoom(roomName.value.trim(), kind);
   roomName.value = "";
+}
+
+function kindLabel(k: GameKind): string {
+  return k === "tp" ? "三张牌" : "德州";
 }
 </script>
 
@@ -27,14 +45,17 @@ async function onCreateRoom(): Promise<void> {
     <main class="lobby-main">
       <div class="lobby-actions">
         <input v-model="roomName" class="input room-name" maxlength="20" placeholder="房间名（可选）" />
-        <button class="btn primary" @click="onCreateRoom">创建房间</button>
+        <button class="btn primary" @click="onCreateClick">创建房间</button>
       </div>
 
       <p class="label">房间列表</p>
       <div v-if="rooms.length" class="room-list">
         <div v-for="r in rooms" :key="r.id" class="room-card">
           <div class="room-meta">
-            <div class="room-title">{{ r.name }}</div>
+            <div class="room-title">
+              {{ r.name }}
+              <span class="tag kind-tag">{{ kindLabel(r.kind || 'holdem') }}</span>
+            </div>
             <div class="room-sub">
               <span>{{ r.status === 'playing' ? '对局中' : '等待中' }}</span>
               <span class="sep">·</span>
@@ -62,6 +83,15 @@ async function onCreateRoom(): Promise<void> {
         <p class="dim">创建一个房间，房主可随时增减机器人凑局</p>
       </div>
     </main>
+
+    <ChoiceDialog
+      v-if="pickOpen"
+      label="创建房间"
+      title="选择玩法"
+      :options="kindOptions"
+      @choose="onPickKind"
+      @cancel="pickOpen = false"
+    />
 
     <p v-if="error" class="error fixed">{{ error }}</p>
   </div>

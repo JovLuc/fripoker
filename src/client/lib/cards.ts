@@ -23,18 +23,18 @@ export function suitClass(code: string): string {
   return s === "H" || s === "D" ? "red" : "black";
 }
 
-export function posLabel(p: PlayerView | null): string {
-  if (!p) return "";
-  if (p.isDealer) return "D";
-  if (p.isSB) return "SB";
-  if (p.isBB) return "BB";
-  return "";
-}
-
-/** Seat badge text: departure / bust win over the blind position. Empty hides the badge. */
-export function posText(p: PlayerView | null): string {
+/**
+ * Seat badge text: departure / bust win over the button. Empty hides the badge.
+ * `kind === "tp"` renders the button as 庄 instead of D.
+ * Peek state lives in the turn-dot (「看」), not here; turn highlight is the
+ * `.player.active` border.
+ */
+export function posText(p: PlayerView | null, kind?: string): string {
   if (!p) return "";
   if (p.left) return "离开";
   if (p.busted) return "破产";
-  return posLabel(p);
+  if (p.isDealer) return kind === "tp" ? "庄" : "D";
+  if (p.isSB) return "SB";
+  if (p.isBB) return "BB";
+  return "";
 }

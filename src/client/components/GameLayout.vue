@@ -24,7 +24,7 @@ onUnmounted(() => {
 });
 
 /** Seat columns: landscape 3–5/row (≤2 rows); portrait 2–3 for wider cards.
- *  Rows beyond 2 scroll inside the band (Y). */
+ *  Rows are always half-height (CSS); 3+ rows scroll inside the band. */
 const seatCols = computed(() => {
   const n = room.game?.players.length ?? 0;
   if (portrait.value) {
@@ -33,12 +33,6 @@ const seatCols = computed(() => {
   }
   const rows = Math.max(1, Math.ceil(n / 5));
   return Math.min(5, Math.max(3, Math.ceil(n / rows)));
-});
-
-/** More than 2 rows => the band gets a fixed 2-row window and scrolls. */
-const playersScroll = computed(() => {
-  const n = room.game?.players.length ?? 0;
-  return Math.ceil(n / seatCols.value) > 2;
 });
 </script>
 
@@ -49,7 +43,6 @@ const playersScroll = computed(() => {
 
     <div
       class="players-row"
-      :class="{ multi: playersScroll }"
       :style="{ '--seat-cols': String(seatCols) }"
     >
       <PlayerCard

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BIG_BLIND, SMALL_BLIND, STARTING_CHIPS } from "../../shared/constants.js";
-import { RANK_VALUE } from "./cards.js";
+import { BIG_BLIND, SMALL_BLIND, STARTING_CHIPS } from "../../../shared/constants.js";
+import { RANK_VALUE } from "../core/cards.js";
 import { applyAction, createGameState, legalActions, startHand, stepAfterAction } from "./handFlow.js";
 
 /** Two funded humans only; no bots are seeded. */

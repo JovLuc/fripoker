@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createGameState } from "../game/index.js";
+import { createGameState } from "../game/holdem/handFlow.js";
 import { tryChatCheat } from "./cheat.js";
 
 function state() {

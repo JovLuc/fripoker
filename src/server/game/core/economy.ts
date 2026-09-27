@@ -2,8 +2,8 @@
 // Borrowing adds chips from thin air on purpose (LAN house money); debt
 // compounds ×1.1 per hand after a one-hand grace period (see handFlow.resetHand).
 
-import { REPAY_CHIPS } from "../../shared/constants.js";
-import type { GameState, Player } from "./types.js";
+import { REPAY_CHIPS } from "../../../shared/constants.js";
+import type { BaseGame, BasePlayer } from "./types.js";
 
 export interface BorrowOk {
   ok: true;
@@ -24,7 +24,7 @@ export interface RepayOk {
 export type RepayResult = RepayOk | { ok: false; error: string };
 
 /** Append-only: one log entry per bust episode; history never cleared. */
-export function noteBusted(state: GameState): { id: string; name: string }[] {
+export function noteBusted(state: BaseGame): { id: string; name: string }[] {
   const added: { id: string; name: string }[] = [];
   for (const p of state.players) {
     if (p.chips > 0) continue;
@@ -37,7 +37,7 @@ export function noteBusted(state: GameState): { id: string; name: string }[] {
 }
 
 /** Funded, present seats — departed (left) players never keep a game alive. */
-export function playersWithChips(state: GameState): Player[] {
+export function playersWithChips(state: BaseGame): BasePlayer[] {
   return state.players.filter((p) => p.chips > 0 && !p.left);
 }
 
@@ -45,7 +45,7 @@ export function playersWithChips(state: GameState): Player[] {
  * Borrow chips anytime (busted or not). A seat that busted mid-hand stays out
  * (folded, sittingOut) until the next deal. Does not clear the bust history.
  */
-export function borrowChips(state: GameState, playerId: string, amount: number): BorrowResult {
+export function borrowChips(state: BaseGame, playerId: string, amount: number): BorrowResult {
   const chips = Math.floor(Number(amount));
   if (!Number.isFinite(chips) || chips <= 0) return { ok: false, error: "非法金额" };
   const player = state.players.find((p) => p.id === playerId);
@@ -84,7 +84,7 @@ export function borrowChips(state: GameState, playerId: string, amount: number):
 }
 
 /** Each repay pays min(debt, REPAY_CHIPS); partials OK so compound debt clears over clicks. */
-export function repayDebt(state: GameState, playerId: string): RepayResult {
+export function repayDebt(state: BaseGame, playerId: string): RepayResult {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return { ok: false, error: "你不在对局中" };
   const debt = player.debt || 0;
@@ -100,4 +100,40 @@ export function repayDebt(state: GameState, playerId: string): RepayResult {
     amount: pay,
     remaining: player.debt,
   };
+}
+
+/**
+ * Debt interest at deal time: skip the first hand after a fresh borrow
+ * (debtHands === 0), then compound ×1.1 each hand. Called by every mode's
+ * reset/deal step.
+ */
+export function accrueInterest(players: BasePlayer[]): void {
+  for (const p of players) {
+    if (p.debt > 0) {
+      if ((p.debtHands | 0) > 0) {
+        // integer math: ceil(debt * 1.1) without float 1.1 rounding up
+        p.debt = Math.ceil((p.debt * 11) / 10);
+      }
+      p.debtHands = (p.debtHands | 0) + 1;
+    } else {
+      p.debtHands = 0;
+    }
+  }
+}
+
+/**
+ * < 2 funded seats ⇒ game over: set gameOver/handOver and the standard
+ * end-game message. Returns true when the game just ended.
+ * Used by every mode's deal step and GameHost.afterStep.
+ */
+export function endGameIfBusted(state: BaseGame): boolean {
+  const left = playersWithChips(state);
+  if (left.length >= 2) return false;
+  state.gameOver = true;
+  state.handOver = true;
+  const broke = state.players.filter((p) => p.chips <= 0).map((p) => p.name);
+  state.message = left.length
+    ? `对局结束 · ${broke.join("、")} 破产 · ${left[0].name} 赢家`
+    : `对局结束 · ${broke.join("、")} 破产`;
+  return true;
 }

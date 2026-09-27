@@ -18,18 +18,19 @@ AI / 新开发者入口文档。**本层只做导航与约定**，细节写进�
 
 ## 项目是什么
 
-局域网德州扑克（摸鱼用）：浏览器打开 URL，设昵称 → 房间 → 开局对打。**TypeScript 全栈**：服务端 tsc 编译为纯 JS 单进程（静态页 + WebSocket，运行依赖仅 `ws`）；前端 Vue 3 SFC（Vite 构建）。消息协议由 `src/shared/protocol.ts` 前后端共享，双向统一 `{ type, payload? }`。
+局域网牌类（摸鱼用）：浏览器打开 URL，设昵称 → 房间（**创建时选玩法：德州扑克 / 三张牌**）→ 开局对打。**TypeScript 全栈**：服务端 tsc 编译为纯 JS 单进程（静态页 + WebSocket，运行依赖仅 `ws`）；前端 Vue 3 SFC（Vite 构建）。消息协议由 `src/shared/protocol.ts` 前后端共享，双向统一 `{ type, payload? }`；游戏快照 `GameSnapshot` 是 `kind` 可辨识联合（`holdem` | `tp`），先窄化再读专属字段。
 
 ## 功能地图
 
 - 昵称（localStorage 持久化）
-- 房间：创建 / 加入未开局 / 观战已开局；1–10 席（真人 + 机器人），**机器人由房主在房间页增/减**（仅等待中；开局不自动补）；起始 **2000** 币，盲注 **10/20** 固定
+- 房间：**创建时选玩法（`kind` 终生不变）**，创建 / 加入未开局 / 观战已开局；1–10 席（真人 + 机器人），**机器人由房主在房间页增/减**（仅等待中；开局不自动补）；起始 **2000** 币
+- **玩法 A 德州（`kind:"holdem"`，默认）**：盲注 **10/20** 固定；长短牌开关（短牌 6+ = 36 张（≥6）+ **三条>顺子、同花>葫芦** + A 低成顺 A6789；本手结束后才可切换、下一手生效；机器人有对应短牌牌力表，`src/server/game/holdem/bot.ts`）
+- **玩法 B 三张牌（`kind:"tp"`）**：底注 20、**无圈无上限的连续行动**（每回合必须下注/弃/开，不能过牌）；暗牌下 ≥N、看牌下 ≥2N（N 起始 10，抬价即更新、看牌注折半向上取整）；看牌仅限自己回合、看后明牌；**开牌费 = 当回合下注成本**、只对**同看牌状态**的对手（暗开暗、明开明），输家亮牌赢家不亮开；**首手座位0坐庄、此后赢家坐庄，庄先行动**；开到只剩一人结束，全员 all-in 摊牌兜底；牌型 三条>同花顺>同花>顺子>对子>高牌，同型比花色破平；机器人支持闷开（三条必开）
 - 一手结束 **不自动开下一手**；**所有有币玩家点「准备」后自动开局**（0 币不能准备，借钱后可以）；破产者观战，≥2 人有币则继续
-- 操作：弃牌 / 过牌·跟注 / 加注 + 滑杆（±10、池比例）；**无操作超时**
+- 操作：弃牌 / 过牌·跟注 / 加注 + 滑杆（±10、池比例）；三张牌下注/弃/开牌 + 看牌（**无过牌、无轮次上限**）；**无操作超时**
 - 断线可重连座位（`playerId` 本地保存）；空房（无人）立刻销毁
 - 房间聊天（可拖按钮 + 四象限展开面板）；河牌左侧「xxx已破产」记录
-- 作弊码：**房间页房主开关，默认开**（状态栏「借钱:开/关」，协议仍为 `setCheat`）；开时聊天「爸爸」借 200、「爷爷」借 500、「还钱」还清；刚借完下一手不计息，之后每手 ×1.1（`src/server/cheat/`）
-- 长短牌：**房间页房主开关（「借钱」旁），默认长牌**（状态栏「牌型:长牌/短牌」，协议 `setShortDeck`）；短牌 6+ = 36 张（≥6）+ **三条>顺子、同花>葫芦** + A 低成顺 A6789；本手结束后才可切换、下一手生效；机器人有对应短牌牌力表（`src/server/bot/`）
+- 作弊码：**房间页房主开关，默认开**（状态栏「借钱:开/关」，协议仍为 `setCheat`）；开时聊天「爸爸」借 200、「爷爷」借 500、「还钱」还清；刚借完下一手不计息，之后每手 ×1.1（`src/server/game/core/economy.ts`）
 - 禁右键、禁框选（输入框除外）
 - 路径前缀 `BASE_PATH`（**默认 `/fpk`**；设空串回根路径，nginx 反代）
 
@@ -41,8 +42,8 @@ AI / 新开发者入口文档。**本层只做导航与约定**，细节写进�
 | 进程入口 / 组装根 | `src/server/index.ts` / `app.ts` | `src/server/AGENTS.md` |
 | HTTP 静态 / 连接上下文 | `src/server/net/` | `src/server/AGENTS.md` |
 | 大厅 / 房间 / 编排 / 序列化 | `src/server/lobby/` `room/` | `src/server/AGENTS.md` |
-| 规则引擎（牌型、边池、结算、借贷） | `src/server/game/` | `src/server/AGENTS.md` |
-| 机器人决策 / 聊天作弊 | `src/server/bot/` `cheat/` | `src/server/AGENTS.md` |
+| 规则引擎（共享 core + 两玩法） | `src/server/game/`（`core/` `holdem/` `tp/` `registry.ts`） | `src/server/AGENTS.md` |
+| 聊天作弊 | `src/server/cheat/`（机器人在 `game/holdem/bot.ts` `game/tp/bot.ts`） | `src/server/AGENTS.md` |
 | 前端组件 / stores / composables | `src/client/` | `docs/client.md` |
 | 类型化 WS 客户端 | `src/client/api/ws.ts` | `docs/client.md` |
 | 单测 + e2e 冒烟 | `src/**/*.test.ts` | `npm test` |
@@ -63,7 +64,7 @@ AI / 新开发者入口文档。**本层只做导航与约定**，细节写进�
 ## 开发要求
 
 1. **改消息协议** → `src/shared/protocol.ts` 是唯一契约：先改类型，再同步 `server/app.ts`（`parseClientMessage` + `routeMessage`）与 `client/stores/session.ts`（分发），最后更新 `docs/client.md` 协议段
-2. **改规则/结算/借贷** → `src/server/game/`，补/改对应 `*.test.ts`（筹码守恒、牌型排序、边池分层是回归底线）
+2. **改规则/结算/借贷** → 对应玩法目录 `src/server/game/holdem/` 或 `src/server/game/tp/`（跨玩法共享进 `game/core/`），补/改对应 `*.test.ts`（筹码守恒、牌型排序、边池分层是回归底线）；**新增玩法** = 实现 `GameMode` 接口 + 在 `game/registry.ts` 注册 + 协议 `GameSnapshot` 加分支 + 前端按 `kind` 分支
 3. **改房间/聊天/广播** → `src/server/room/` + `app.ts` 路由分支
 4. **改 UI/交互** → `src/client/`（组件 + stores + composables），见 `docs/client.md`；注意「预留高度」避免布局跳动
 5. **不要**手改 `dist/`（gitignore 的构建产物）；后端保持零框架零额外依赖，前端保持 Vue 3 + Vite
@@ -73,9 +74,10 @@ AI / 新开发者入口文档。**本层只做导航与约定**，细节写进�
 ## 快速定位
 
 - 找「谁处理 WS 消息」→ `src/server/app.ts` `routeMessage` / `parseClientMessage`
-- 找「谁发房间快照」→ `src/server/room/serializer.ts` `serializeFor` / `broadcastRoom`
-- 找「比牌/边池/结算」→ `src/server/game/evaluator.ts` `evaluate7` / `showdown.ts` `buildPots` / `showdown`
-- 找「破产观战 / 借贷还钱」→ `src/server/room/gameHost.ts` `afterStep` + `src/server/game/economy.ts`
+- 找「谁发房间快照」→ `src/server/room/serializer.ts` `serializeFor`（游戏段委托 `mode.serialize`）
+- 找「玩法怎么分发」→ `src/server/game/registry.ts` `getMode` + `core/mode.ts` `GameMode`
+- 找「德州比牌/边池/结算」→ `src/server/game/holdem/evaluator.ts` `evaluate7` / `showdown.ts`；三张牌 → `src/server/game/tp/evaluator.ts` `evaluate3` / `flow.ts`
+- 找「破产观战 / 借贷还钱」→ `src/server/room/gameHost.ts` `afterStep` + `src/server/game/core/economy.ts`
 - 找「机器人增/减」→ `src/server/room/room.ts` `addRoomBot` / `removeRoomBot`（仅房主、仅 waiting）
 - 找「聊天 / 拖按钮」→ `src/client/components/ChatDock.vue` + `src/client/composables/useChatDock.ts`
 - 找「路径前缀」→ `src/server/net/staticFiles.ts` `pathPrefixes` / `stripBase`
