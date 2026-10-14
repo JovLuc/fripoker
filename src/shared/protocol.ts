@@ -193,6 +193,7 @@ export interface RoomSnapshot {
   maxPlayers: number;
   chat: ChatMessage[];
   chatTotal: number;
+  borrowRequests: { id: string; fromId: string; fromName: string; toId: string; amount: number }[];
   game: GameSnapshot | null;
 }
 
@@ -211,6 +212,8 @@ export type ClientMessage =
   | { type: "startGame" }
   | { type: "ready" }
   | { type: "repay" }
+  | { type: "borrowRequest"; payload: { targetId: string; amount: number } }
+  | { type: "borrowRespond"; payload: { requestId: string; accept: boolean } }
   | { type: "setCheat"; payload: { enabled: boolean } }
   | { type: "setShortDeck"; payload: { enabled: boolean } }
   | { type: "action"; payload: { action: PlayerActionName; amount?: number; targetId?: string } }

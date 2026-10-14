@@ -107,11 +107,11 @@ describe("applyAction validation", () => {
   it("rejects raising below the minimum", () => {
     const state = headsUpState();
     startHand(state);
-    // currentBet 20, lastRaiseSize 20 → min raise-to is 40
+    // currentBet 10, lastRaiseSize 10 → min raise-to is 20
     const legal = legalActions(state)!;
-    expect(legal.minRaiseTo).toBe(40);
-    const res = applyAction(state, "raise", 30);
-    expect(res).toEqual({ ok: false, error: "加注至少到 40" });
+    expect(legal.minRaiseTo).toBe(20);
+    const res = applyAction(state, "raise", 15);
+    expect(res).toEqual({ ok: false, error: "加注至少到 20" });
   });
 
   it("rejects raising above the maximum", () => {
@@ -125,9 +125,9 @@ describe("applyAction validation", () => {
     const state = headsUpState();
     startHand(state);
     const actor = state.players[state.actionIndex];
-    actor.chips = 15; // can only reach 25 total, below minRaiseTo 40
+    actor.chips = 5; // can only reach 10 total, below minRaiseTo 20
     const legal = legalActions(state)!;
-    expect(legal.maxRaiseTo).toBe(actor.roundBet + 15);
+    expect(legal.maxRaiseTo).toBe(actor.roundBet + 5);
     const res = applyAction(state, "raise", legal.maxRaiseTo);
     expect(res.ok).toBe(true);
     expect(actor.allIn).toBe(true);
@@ -136,7 +136,7 @@ describe("applyAction validation", () => {
   it("rejects checking when a bet is outstanding", () => {
     const state = headsUpState();
     startHand(state);
-    // heads-up preflop, dealer/SB faces the BB's 20
+    // heads-up preflop, dealer/SB faces the BB's 10
     const res = applyAction(state, "check");
     expect(res).toEqual({ ok: false, error: "不能过牌" });
   });
@@ -144,11 +144,11 @@ describe("applyAction validation", () => {
   it("min-raise tracks the last raise size", () => {
     const state = headsUpState();
     startHand(state);
-    applyAction(state, "raise", 60); // raise size 40 over the 20 BB
+    applyAction(state, "raise", 60); // raise size 50 over the 10 BB
     stepAfterAction(state);
     expect(state.currentBet).toBe(60);
-    // BB now faces a min re-raise of 60 + 40 = 100
-    expect(legalActions(state)!.minRaiseTo).toBe(100);
+    // BB now faces a min re-raise of 60 + 50 = 110
+    expect(legalActions(state)!.minRaiseTo).toBe(110);
     expect(applyAction(state, "call").ok).toBe(true);
     expect(stepAfterAction(state)).toBe("continue");
     expect(state.phase).toBe("flop");

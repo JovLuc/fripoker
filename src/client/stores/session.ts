@@ -180,6 +180,14 @@ export function toggleRepay(): void {
   ws.send({ type: "repay" });
 }
 
+export function requestBorrow(targetId: string, amount: number): void {
+  ws.send({ type: "borrowRequest", payload: { targetId, amount } });
+}
+
+export function respondBorrow(requestId: string, accept: boolean): void {
+  ws.send({ type: "borrowRespond", payload: { requestId, accept } });
+}
+
 /** Host-only room-page switch for chat cheats (server enforces the role). */
 export function setRoomCheat(enabled: boolean): void {
   ws.send({ type: "setCheat", payload: { enabled } });

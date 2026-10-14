@@ -173,6 +173,7 @@ export function createServerApp(config: ServerConfig): ServerApp {
           room.spectatorSockets.add(conn);
         } else {
           room.sockets.set(conn.playerId, conn);
+          if (room.status === "playing") gameHost.addLateJoiner(room, conn.playerId, conn.nickname);
         }
         conn.send({
           type: "joined",
@@ -250,6 +251,35 @@ export function createServerApp(config: ServerConfig): ServerApp {
         if (cheat && !cheat.ok) conn.sendError(cheat.error);
         broadcastRoom(room);
         return;
+      }
+
+      case "borrowRequest": {
+        const room = conn.roomId ? registry.get(conn.roomId) : null;
+        const game = room?.game;
+        const borrower = game?.players.find((p) => p.id === conn.playerId);
+        const lender = game?.players.find((p) => p.id === msg.payload.targetId);
+        const amount = msg.payload.amount;
+        if (!room || !game || !game.handOver || game.gameOver || !borrower || borrower.chips !== 0 || !lender || lender.id === borrower.id ||
+            !Number.isSafeInteger(amount) || amount <= 0 || lender.chips < amount) {
+          conn.sendError("借款条件不满足"); return;
+        }
+        if (room.borrowRequests.some((r) => r.fromId === borrower.id)) { conn.sendError("已有借款申请待处理"); return; }
+        room.borrowRequests.push({ id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, fromId: borrower.id, fromName: borrower.name, toId: lender.id, amount });
+        broadcastRoom(room); return;
+      }
+
+      case "borrowRespond": {
+        const room = conn.roomId ? registry.get(conn.roomId) : null;
+        const req = room?.borrowRequests.find((r) => r.id === msg.payload.requestId && r.toId === conn.playerId);
+        if (!room || !room.game || !room.game.handOver || room.game.gameOver || !req) { conn.sendError("借款申请已失效；借款仅限本手结束后的准备阶段"); return; }
+        room.borrowRequests = room.borrowRequests.filter((r) => r.id !== req.id);
+        if (msg.payload.accept) {
+          const from = room.game.players.find((p) => p.id === req.fromId);
+          const to = room.game.players.find((p) => p.id === req.toId);
+          if (!from || !to || from.chips !== 0 || to.chips < req.amount) conn.sendError("筹码已变化，交易未成功");
+          else { from.chips += req.amount; to.chips -= req.amount; from.sittingOut = true; }
+        }
+        broadcastRoom(room); return;
       }
 
       case "setCheat": {
@@ -401,6 +431,10 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     case "repay":
     case "sync":
       return { type: obj.type };
+    case "borrowRequest":
+      return { type: "borrowRequest", payload: { targetId: str(payload?.targetId), amount: Number(payload?.amount) } };
+    case "borrowRespond":
+      return { type: "borrowRespond", payload: { requestId: str(payload?.requestId), accept: payload?.accept === true } };
     case "setCheat":
       return { type: "setCheat", payload: { enabled: payload?.enabled === true } };
     case "setShortDeck":

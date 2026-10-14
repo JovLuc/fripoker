@@ -30,6 +30,7 @@ export const room = reactive({
   humanPlayers: [] as RoomSnapshot["humanPlayers"],
   botPlayers: [] as RoomSnapshot["botPlayers"],
   spectators: [] as RoomSnapshot["spectators"],
+  borrowRequests: [] as RoomSnapshot["borrowRequests"],
   maxPlayers: 10,
   game: null as GameSnapshot | null,
 });
@@ -46,6 +47,7 @@ export function applyRoomSnapshot(snap: RoomSnapshot): void {
   room.humanPlayers = snap.humanPlayers || [];
   room.botPlayers = snap.botPlayers || [];
   room.spectators = snap.spectators || [];
+  room.borrowRequests = snap.borrowRequests || [];
   room.maxPlayers = snap.maxPlayers || 10;
   room.game = snap.game;
   applyChat(snap.chat, snap.chatTotal);
@@ -68,6 +70,7 @@ export function resetRoomState(): void {
   room.kind = "holdem";
   room.status = "waiting";
   room.cheatEnabled = true;
+  room.borrowRequests = [];
   room.shortDeck = false;
   role.value = "player";
   resetChat();

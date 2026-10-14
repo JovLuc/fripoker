@@ -5,7 +5,7 @@ import GameLayout from "./GameLayout.vue";
 import WaitingRoom from "./WaitingRoom.vue";
 import { error } from "../stores/error.js";
 import { phaseLabel, role, room } from "../stores/room.js";
-import { leaveRoom, setRoomCheat, setRoomShortDeck } from "../stores/session.js";
+import { leaveRoom, setRoomShortDeck } from "../stores/session.js";
 
 const isHoldem = computed(() => room.kind === "holdem");
 </script>
@@ -26,13 +26,6 @@ const isHoldem = computed(() => room.kind === "holdem");
       <span v-if="room.kind === 'tp'" class="tag">三张牌</span>
       <span v-if="role === 'spectator'" class="tag">观战</span>
       <span v-else-if="role === 'host'" class="tag">房主</span>
-      <button
-        v-if="role === 'host'"
-        class="tag-btn"
-        type="button"
-        @click="setRoomCheat(!room.cheatEnabled)"
-      >借钱:{{ room.cheatEnabled ? '开' : '关' }}</button>
-      <span v-else-if="room.cheatEnabled" class="tag">借钱</span>
       <template v-if="isHoldem">
         <button
           v-if="role === 'host'"
@@ -44,13 +37,12 @@ const isHoldem = computed(() => room.kind === "holdem");
         >牌型:{{ room.shortDeck ? '短牌' : '长牌' }}</button>
         <span v-else-if="room.shortDeck" class="tag">短牌</span>
       </template>
+      <ChatDock />
     </div>
 
     <!-- both stay mounted; only visibility toggles (no re-mount reflow) -->
     <WaitingRoom v-show="room.status === 'waiting'" />
     <GameLayout v-show="!!room.game" />
-
-    <ChatDock />
 
     <p v-if="error" class="error fixed">{{ error }}</p>
   </div>

@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { request } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
+import { STARTING_CHIPS, SMALL_BLIND, BIG_BLIND } from "../../shared/constants.js";
 import { TestClient, testConfig, until } from "./harness.js";
 import { createServerApp } from "../app.js";
 import type { ServerApp } from "../app.js";
@@ -100,7 +101,7 @@ describe("e2e: full room flow", () => {
     expect(snap.status).toBe("playing");
     expect(snap.game!.players).toHaveLength(6); // 2 humans + 4 bots
     expect(snap.game!.phase).toBe("preflop");
-    expect(snap.game!.message).toBe("第 1 手 · 10/20");
+    expect(snap.game!.message).toBe(`第 1 手 · ${SMALL_BLIND}/${BIG_BLIND}`);
     // holes visible only to their owner
     const me = snap.game!.players.find((p) => p.isMe)!;
     expect(me.holeCards).toHaveLength(2);
@@ -139,7 +140,7 @@ describe("e2e: full room flow", () => {
     expect(g.pot).toBe(0);
     expect(g.handOver).toBe(true);
     const total = g.players.reduce((sum, p) => sum + p.chips, 0);
-    expect(total).toBe(2000 * 6);
+    expect(total).toBe(STARTING_CHIPS * 6);
 
     // ready flow: alice readies and waits, bob readies → auto next hand
     alice.send({ type: "ready" });
@@ -149,25 +150,21 @@ describe("e2e: full room flow", () => {
     expect(bob.lastRoom!.game!.handOver).toBe(false);
   });
 
-  it("chat cheat borrows and repays", async () => {
+  it("legacy chat loan phrases remain plain chat", async () => {
+    const before = alice.lastRoom!.chatTotal;
     alice.send({ type: "chat", payload: { text: "爸爸" } });
-    await alice.roomWhere(
-      (s) => s.game!.players.find((p) => p.id === "p_alice")!.debt === 200,
-      5000,
-      "borrow reflected",
-    );
-    const snap = alice.lastRoom!;
-    const me = snap.game!.players.find((p) => p.id === "p_alice")!;
-    expect(me.chips).toBeGreaterThan(0);
-    expect(snap.chatTotal).toBeGreaterThan(0);
-    expect(snap.chat.some((m) => m.playerId === "system" && m.text.includes("借款"))).toBe(true);
+    await alice.roomWhere((s) => s.chatTotal > before, 5000, "loan phrase chat received");
+    let snap = alice.lastRoom!;
+    expect(snap.chat.some((m) => m.playerId === "p_alice" && m.text === "爸爸")).toBe(true);
+    expect(snap.game!.players.find((p) => p.id === "p_alice")!.debt).toBe(0);
+    expect(snap.chat.some((m) => m.playerId === "system" && m.text.includes("借款"))).toBe(false);
 
+    const afterBorrowPhrase = snap.chatTotal;
     alice.send({ type: "chat", payload: { text: "还钱" } });
-    await alice.roomWhere(
-      (s) => s.game!.players.find((p) => p.id === "p_alice")!.debt === 0,
-      5000,
-      "repay reflected",
-    );
+    await alice.roomWhere((s) => s.chatTotal > afterBorrowPhrase, 5000, "repay phrase chat received");
+    snap = alice.lastRoom!;
+    expect(snap.chat.some((m) => m.playerId === "p_alice" && m.text === "还钱")).toBe(true);
+    expect(snap.game!.players.find((p) => p.id === "p_alice")!.debt).toBe(0);
   });
 
   it("host toggles room cheats from the room page", async () => {
@@ -336,7 +333,7 @@ describe("e2e: full room flow", () => {
       expect(hostFolded).toBe(true);
       const g = host.lastRoom!.game!;
       const total = g.players.reduce((sum, p) => sum + p.chips, 0);
-      expect(total).toBe(2000 * 2);
+      expect(total).toBe(STARTING_CHIPS * 2);
 
       // hand over: switching back (long deck) now goes through
       host.send({ type: "setShortDeck", payload: { enabled: false } });

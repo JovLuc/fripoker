@@ -3,9 +3,9 @@
 // localStorage keys are used by the client only but live here so the
 // persistence contract is documented in one place.
 
-export const STARTING_CHIPS = 2000;
-export const SMALL_BLIND = 10;
-export const BIG_BLIND = 20;
+export const STARTING_CHIPS = 500;
+export const SMALL_BLIND = 5;
+export const BIG_BLIND = 10;
 export const MAX_PLAYERS = 10;
 
 // --- three-card (tp) rule constants; shared so room-page copy stays truthful ---

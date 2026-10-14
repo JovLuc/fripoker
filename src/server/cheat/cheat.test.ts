@@ -15,7 +15,7 @@ describe("tryChatCheat (room-level switch, fixed amounts)", () => {
     const g = state();
     const res = tryChatCheat(g, "p1", "爸爸", true);
     expect(res).toMatchObject({ ok: true, action: "borrow", chips: 200, debt: 200, trigger: "爸爸" });
-    expect(g.players[0].chips).toBe(2200);
+    expect(g.players[0].chips).toBe(700);
   });
 
   it("「爷爷」 borrows 500", () => {

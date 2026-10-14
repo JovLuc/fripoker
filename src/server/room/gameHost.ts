@@ -4,6 +4,7 @@
 // never imports a concrete engine. Owns the room's single timer (bot delay).
 
 import type { PlayerActionName } from "../../shared/protocol.js";
+import { STARTING_CHIPS } from "../../shared/constants.js";
 import type { BotDelay } from "../config.js";
 import { endGameIfBusted, noteBusted, playersWithChips } from "../game/core/economy.js";
 import type { BaseGame, HandStep } from "../game/core/types.js";
@@ -26,6 +27,17 @@ export class GameHost {
     private readonly events: RoomEvents,
     private readonly botDelay: BotDelay,
   ) {}
+
+  addLateJoiner(room: Room, playerId: string, name: string): void {
+    if (!room.game || room.game.players.some((p) => p.id === playerId)) return;
+    const mode = getMode(room.game.kind);
+    const seed = mode.create([{ id: playerId, name, isBot: false }], { shortDeck: room.shortDeck }).players[0];
+    seed.seat = room.game.players.length;
+    seed.chips = STARTING_CHIPS;
+    seed.sittingOut = true;
+    room.game.players.push(seed);
+    this.events.broadcastRoom(room);
+  }
 
   startGame(room: Room): HostResult {
     if (room.status === "playing") return { ok: false, error: "已开局" };
@@ -137,6 +149,8 @@ export class GameHost {
     if (playersWithChips(room.game).length < 2) return { ok: false, error: "可继续的玩家不足" };
     if (!allRequiredReady(room)) return { ok: false, error: "还有人未准备" };
     const mode = getMode(room.game.kind);
+    // Loan requests are valid only during the between-hands preparation window.
+    room.borrowRequests = [];
     const result = mode.startHand(room.game);
     room.readyIds = new Set();
     if (room.game.gameOver) {
@@ -156,6 +170,7 @@ export class GameHost {
       const added = noteBusted(room.game);
       room.readyIds = new Set();
       if (endGameIfBusted(room.game)) {
+        room.borrowRequests = [];
         this.events.broadcastRoom(room);
         return;
       }

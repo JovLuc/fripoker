@@ -17,7 +17,7 @@ describe("borrowChips", () => {
     expect(res).toEqual({
       ok: true, action: "borrow", chips: 200, wasBusted: false, debt: 200, midHand: false,
     });
-    expect(state.players[0].chips).toBe(2200);
+    expect(state.players[0].chips).toBe(700);
     expect(state.players[0].debtHands).toBe(0);
   });
 
@@ -92,6 +92,7 @@ describe("repayDebt", () => {
     const p = state.players[0];
     p.debt = 1200;
     p.debtHands = 3;
+    p.chips = 1200;
     expect(repayDebt(state, "p1")).toEqual({ ok: true, action: "repay", amount: REPAY_CHIPS, remaining: 700 });
     expect(repayDebt(state, "p1")).toEqual({ ok: true, action: "repay", amount: REPAY_CHIPS, remaining: 200 });
     expect(repayDebt(state, "p1")).toEqual({ ok: true, action: "repay", amount: 200, remaining: 0 });
