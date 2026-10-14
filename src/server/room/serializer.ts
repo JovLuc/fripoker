@@ -23,6 +23,7 @@ export function serializeFor(room: Room, viewerId: string): RoomSnapshot {
     maxPlayers: MAX_PLAYERS,
     chat: room.chat.slice(-CHAT_HISTORY_KEEP),
     chatTotal: room.chatTotal,
+    borrowRequests: room.borrowRequests,
   };
 
   if (!room.game) return { ...base, game: null };

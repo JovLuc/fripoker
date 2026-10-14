@@ -1,11 +1,9 @@
 /* Floating chat — fixed, out of main layout flow. */
 
 .chat-dock {
-  position: fixed;
-  /* below both room header rows (top bar + status bar) so it never covers them;
-     +safe-area for notched phones */
-  top: calc(80px + env(safe-area-inset-top, 0px));
-  right: max(16px, env(safe-area-inset-right, 0px));
+  position: relative;
+  top: auto;
+  right: auto;
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -13,11 +11,14 @@
   gap: 8px;
   width: max-content;
   max-width: calc(100vw - 24px);
+  margin-left: auto;
 }
 
 .chat-dock.placed {
+  position: fixed;
   right: auto;
   bottom: auto;
+  margin-left: 0;
 }
 
 .chat-dock.dragging {
@@ -191,13 +192,8 @@
   font-size: 12px;
 }
 
-/* portrait: status may wrap to two lines — drop the dock a bit; keep it
-   clear of the action band at the bottom */
+/* portrait: status may wrap to two lines; keep chat within that flow. */
 @media (orientation: portrait) {
-  .chat-dock:not(.placed) {
-    top: calc(108px + env(safe-area-inset-top, 0px));
-  }
-
   .chat-log {
     height: min(220px, 32vh);
   }

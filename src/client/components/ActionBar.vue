@@ -32,7 +32,7 @@ const raiseDisabled = computed(() => {
 const readyHint = computed(() =>
   role.value === "spectator" ? "观战中"
   : mySeat.value && mySeat.value.ready ? ""
-  : mySeat.value && mySeat.value.chips <= 0 ? "余额为0 · 聊天借钱后可准备"
+  : mySeat.value && mySeat.value.chips <= 0 ? "余额为0 · 借到筹码后可准备"
   : "",
 );
 const canReady = computed(() =>

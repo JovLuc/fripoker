@@ -48,13 +48,13 @@
 
 双向 `{ type, payload? }`，完整类型见 `src/shared/protocol.ts`（`ClientMessage` / `ServerMessage` 可辨识联合）。此处不重复字段表。
 
-- **对战页布局（六行比例带）**：`.table-screen.playing` 锁定 `100dvh` + `overflow:hidden` **整页不滚动**；固定六行 top / status / **board / msg / players / 操作栏**，后四带高度由 flex 比例分配（`game.css`：board 1.6 / msg 0.5 / players 5 / action 2.4），**与游戏状态无关**——任意状态只换盒子里的内容（v-show），绝不推挤兄弟带；窄屏（≤560px）公共牌区纵排、矮屏（≤720px）字号紧凑
+- **对战页布局（六行比例带）**：常规视口下 `.table-screen.playing` 锁定 `100dvh` + `overflow:hidden`，固定六行 top / status / **board / msg / players / 操作栏**，后四带按 flex 比例分配；矮横屏（≤520px）切为纵向滚动并给牌区/玩家区保留可读高度，避免压扁卡片与操作区。五张公共牌按中间列可用宽度等比收缩，始终保持一行
 - **横屏优先响应式**：仍是一套六带 DOM；横屏座位列 17% 宽、每行 3–5；竖屏（`orientation: portrait` 或 ≤480px）`GameLayout` 把 `--seat-cols` 降到 1–3、CSS 改 `1fr` 等宽，chips 三区收窄、操作按钮 ≥44px 触控，status 可换行，safe-area 用 `env(safe-area-inset-*)`；**不要**再拆第二套竖屏组件
 - **玩家卡**：横屏固定 **17% 宽**；**行高恒为半高** `grid-auto-rows: calc((100% - 10px)/2)`——1 行占半、2 行+gap 刚好占满、**3 行及以上出 y-scroller**（`overflow-y:auto` 常开 + `align-content: safe center`，**无 JS `.multi` 类**）；10px 固定 gap；列数由 `GameLayout` 下发 CSS 变量 `--seat-cols`（勿 inline 整串 `grid-template-columns`，否则竖屏媒体查询盖不掉）；卡内文字行固定高、手牌区 flex:1 自适应（mini 牌 `height:100%` + `aspect-ratio`）
 - **操作区**：`.action-slot` 单一比例带、**内容顶对齐**，四态（我的回合 / 等待 / 准备 / 破产观战）全部 `v-show` 切换显隐，DOM 常驻不重挂
 - **座位徽标**：单 span `posText(p, kind)`——`离开`（left）/ `破产`（busted）/ `庄`（tp 的 isDealer，hold'em 显 D）/ D·SB·BB 互斥，**空文本整体隐藏**（无空白框）；**看牌状态在 `.turn-dot`（「看」）**，不在 pos 里
 - **结算与破产记录**：`.message-slot` 比例带、水平垂直双居中（多余结算行裁剪）；`.busted-log` 与公共牌同带高、`justify-content: flex-end` 滚动隐藏（最新在最下）——位置在公共牌左侧（右对齐），移动端纵排时置顶
-- **聊天 dock**：fixed 默认 `top:80px / right:16px`（让开顶栏+状态栏两行）；拖拽位置存 `fripoker_chat_pos`，**加载时钳回视口**（换视口不会丢到屏幕外）
+- **聊天 dock**：未拖动时参与状态栏流式布局，不遮挡牌桌内容；拖动后按视口固定定位并存 `fripoker_chat_pos`，**加载时钳回视口**（换视口不会丢到屏幕外）
 - **v-show 约定**：对战页条件展示一律 `v-show`（ActionBar 四态 / PlayerCard 全部条件 / BoardArea 标题与结果 / GameView 双子视图）；常驻渲染要求所有绑定**可空安全**（`room.game?.`，勿用 `!.`），waiting 态 `room.game` 为 null
 - **玩家卡固定槽位**：`.chips-row` 三固定区（余额 / 欠款 46px / 还钱 46px），欠款、还钱不显示也占位；卡背只画外框（`.card.back` 无内芯）
 

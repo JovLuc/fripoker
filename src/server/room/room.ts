@@ -41,6 +41,7 @@ export class Room {
   chat: ChatMessage[] = [];
   /** Total messages ever (chat[] keeps only the last CHAT_HISTORY_KEEP). */
   chatTotal = 0;
+  borrowRequests: { id: string; fromId: string; fromName: string; toId: string; amount: number }[] = [];
   /** Humans ready for the next deal (hand-over flow); bots are always ready. */
   readyIds = new Set<string>();
   /** The only timer concept in a room: the delayed bot action. */
@@ -118,7 +119,7 @@ export function joinRoom(room: Room, playerId: string, playerName: string): Join
     room.spectators = room.spectators.filter((s) => s.id !== playerId);
     return { role: playerId === room.hostId ? "host" : "player" };
   }
-  if (room.status === "playing") {
+  if (room.status === "playing" && !room.hasFreeSeat) {
     if (!room.spectators.find((s) => s.id === playerId)) {
       room.spectators.push({ id: playerId, name: playerName });
     }

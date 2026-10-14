@@ -9,7 +9,7 @@ const emptySeats = computed(() => Math.max(0, room.maxPlayers - seatTotal.value)
 const ruleHint = computed(() =>
   room.kind === "tp"
     ? `2–${room.maxPlayers} 人可开局 · 底注 ${TP_ANTE} · 每手从 10 起注 · 看牌后翻倍 · 开牌至剩一人`
-    : `2–${room.maxPlayers} 人可开局 · 固定盲注 10/20 · 起始 2000 币 · 破产者观战，剩余继续`,
+    : `2–${room.maxPlayers} 人可开局 · 固定盲注 5/10 · 起始 500 币 · 破产者可向玩家借筹码`,
 );
 </script>
 

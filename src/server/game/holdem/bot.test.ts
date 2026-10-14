@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { STARTING_CHIPS } from "../../../shared/constants.js";
 import type { Card } from "../core/types.js";
 import type { GameState, Rank, Suit } from "./types.js";
 import { applyAction, createGameState, startHand, stepAfterAction } from "./handFlow.js";
@@ -64,7 +65,7 @@ function expectBotHandAccepted(state: GameState): void {
   }
   expect(state.handOver).toBe(true);
   const total = state.players.reduce((sum, p) => sum + p.chips, 0) + state.pot;
-  expect(total).toBe(2000 * 6);
+  expect(total).toBe(STARTING_CHIPS * 6);
 }
 
 describe("botDecide", () => {

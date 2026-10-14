@@ -138,7 +138,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 2.5fr) minmax(0, 0.75fr);
   align-items: center;
   gap: 12px;
 }
@@ -176,11 +176,24 @@
 
 .board {
   height: 100%;
+  width: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: clamp(3px, 1vw, 8px);
+}
+
+/* Five slots share the actual board width. Intrinsic card widths previously
+   forced the last community card outside the center column on narrow screens. */
+.board > .card {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  height: auto;
+  max-width: 96px;
+  max-height: 100%;
+  aspect-ratio: 27 / 37;
 }
 
 .card {
@@ -807,6 +820,41 @@
   .chip {
     padding: 3px 6px;
     font-size: 10px;
+  }
+}
+
+/* Short landscape windows cannot fit the six fixed bands legibly. Preserve
+   card and control sizes, then let the table page scroll vertically. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .table-screen.playing {
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
+  }
+
+  .game-layout {
+    flex: 0 0 auto;
+    gap: 6px;
+    padding-top: 6px;
+    padding-bottom: 10px;
+  }
+
+  .board-area {
+    flex: 0 0 88px;
+  }
+
+  .message-slot {
+    flex: 0 0 30px;
+  }
+
+  .players-row {
+    flex: 0 0 min(272px, 85vh);
+    grid-auto-rows: calc((100% - 8px) / 2);
+    row-gap: 8px;
+  }
+
+  .action-slot {
+    flex: 0 0 auto;
   }
 }
 
