@@ -122,13 +122,15 @@ export function accrueInterest(players: BasePlayer[]): void {
 }
 
 /**
- * < 2 funded seats ⇒ game over: set gameOver/handOver and the standard
- * end-game message. Returns true when the game just ended.
+ * Fewer than 2 funded seats ends the game unless at least two live human
+ * seats remain able to borrow and continue. Returns true when the game ends.
  * Used by every mode's deal step and GameHost.afterStep.
  */
 export function endGameIfBusted(state: BaseGame): boolean {
   const left = playersWithChips(state);
-  if (left.length >= 2) return false;
+  const liveHumans = state.players.filter((p) => !p.left && !p.isBot);
+  // Keep the between-hands window open when human seats can borrow and return.
+  if (left.length >= 2 || liveHumans.length >= 2) return false;
   state.gameOver = true;
   state.handOver = true;
   const broke = state.players.filter((p) => p.chips <= 0).map((p) => p.name);

@@ -32,7 +32,7 @@ const isHoldem = computed(() => room.kind === "holdem");
           class="tag-btn"
           type="button"
           :disabled="!!room.game && !room.game.handOver"
-          title="短牌 6+：36 张（≥6），三条>顺子、同花>葫芦；本手结束后生效"
+          title="短牌 6+：36 张（≥6），顺子>三条、同花>葫芦；本手结束后生效"
           @click="setRoomShortDeck(!room.shortDeck)"
         >牌型:{{ room.shortDeck ? '短牌' : '长牌' }}</button>
         <span v-else-if="room.shortDeck" class="tag">短牌</span>

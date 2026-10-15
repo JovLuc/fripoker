@@ -140,7 +140,7 @@ export interface GameSnapshotBase {
   handOver: boolean;
   gameOver: boolean;
   readyIds: string[];
-  /** Seats that must ready to deal (chips > 0); bots report ready: true. */
+  /** Live seats required to deal; broke humans remain unready until they borrow, bots report ready. */
   requiredReady: RequiredReadyPlayer[];
   /** Append-only bust history; borrowing does not clear it. */
   busted: BustRecord[];
@@ -194,6 +194,7 @@ export interface RoomSnapshot {
   chat: ChatMessage[];
   chatTotal: number;
   borrowRequests: { id: string; fromId: string; fromName: string; toId: string; amount: number }[];
+  borrowHistory: { id: string; fromName: string; toName: string; amount: number; ts: number }[];
   game: GameSnapshot | null;
 }
 

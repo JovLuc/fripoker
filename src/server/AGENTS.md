@@ -38,7 +38,7 @@ room/ 只经 getMode(kind) 触碰规则；具体引擎（含各玩法机器人�
 2. `gameHost.startGame`：席位 = 真人 + `room.botPlayers`（房主房间页增减，id `bot_<seq>`，名 东西南北中发白梅兰竹菊；<2 席拒绝开局）→ `getMode(kind).create(seats, {shortDeck})` → `mode.startHand`
 3. 玩家动作：`playerAction` → `mode.applyAction`（返回 `advance:false` = 看牌等不消耗回合的动作，仅广播）→ `mode.stepAfterAction` → `broadcastRoom` → `afterStep`
 4. 机器人：`afterStep("continue")` → `scheduleBot(700–1300ms)` → `runBotIfNeeded` → `mode.botDecide`；看牌返回同样走 `advance:false` → 再调度
-5. `afterStep("hand-end")` → `noteBusted` + **清空 readyIds**；`endGameIfBusted`（<2 席有币 → gameOver 文案）；否则等 **所有 chips>0 玩家 ready**（bot 恒 ready）→ `startNextHand` 自动发牌
+5. `afterStep("hand-end")` → `noteBusted` + **清空 readyIds**；至少 2 席有币才可发下一手；真人座位可借款续局时保留准备窗口，等 **所有未离开真人都有币且 ready**（bot 恒 ready）→ `startNextHand` 自动发牌
 6. 断线/离开：`ws.close` 或 `leaveRoom` → `leaveAll` → `leaveRoom` + （playing 房）`gameHost.handleDeparture`：立即代弃（轮到他则走 `mode.stepAfterAction`，否则静默弃牌、只剩一人则 `mode.endHandByFold`）并标记 `Player.left`——之后每手 `sittingOut`，不参与 ready/续局判定；waiting 房最后一个真人离开即销毁。对局中离开者座位保留（快照 `humanPlayers` 不动、可重连），但大厅列表人数/名字排除 `left` 者（`publicRoomList` 派生）
 
 ## 关键不变量（测试锁死，勿破坏）
@@ -49,10 +49,11 @@ room/ 只经 getMode(kind) 触碰规则；具体引擎（含各玩法机器人�
 - raise 的 amount 语义是 **加注到**（total bet level），不是增量；低于 minRaiseTo 仅允许等于 maxRaiseTo 的全下
 - `serializeFor` 房间字段 + `mode.serialize` 游戏字段；底牌可见性按玩法分：德州 `isMe || revealAll`，三张牌 `(isMe && looked) || revealed || (revealAll && !folded)`；观战者用连接稳定 viewerId
 - `game.busted[]` **append-only**（借钱不清史）；座位角标 `chips<=0 && !allIn` 是另一回事
+- 下一手准备：所有未离开真人都必须有筹码并 ready；0 筹码者先借款再准备；bot 自动 ready；开始下一手仍要求至少 2 席有筹码
 - `Player.left`（离开者）单向标记：`playersWithChips`、`allRequiredReady`、`requiredReady`、发牌 eligible、赢家文案均排除；无行动超时，故离开必须即时代弃，本手不能等他
 - 借贷：`debtHands=0` 宽限一手，之后每手 `debt = ceil(debt*11/10)`；还款每次 `min(debt, 500)`（计息在 `core/economy.accrueInterest`，两种玩法的发牌都调）
 - 作弊码：房间级 `cheatEnabled` **默认开**；仅房主可 `setCheat` 切换（等待/对局中均可）；金额固定「爸爸」200、「爷爷」500、「还钱」每次 `min(debt, 500)`
-- 长短牌：房间级 `shortDeck` **默认关（长牌）**、**仅 `kind==='holdem'` 房间有效**（tp 房 `app.ts` 拒绝 `setShortDeck`）；仅房主可切换，且**本手未结束才可切**，生效于下一次 `resetHand` 重建牌堆；短牌规则 = 36 张（6..A）+ 6+ 排序 + A 低顺
+- 长短牌：房间级 `shortDeck` **默认关（长牌）**、**仅 `kind==='holdem'` 房间有效**（tp 房 `app.ts` 拒绝 `setShortDeck`）；仅房主可切换，且**本手未结束才可切**，生效于下一次 `resetHand` 重建牌堆；短牌规则 = 36 张（6..A）+ A 低顺 + **顺子>三条、同花>葫芦**
 - 房间内**唯一**定时器是 `Room.botTimer`；`destroyRoom`/close 时必须 clear
 - **三张牌（tp）规则**：**无圈、无轮数上限的连续行动**——座位轮转，每次轮到必须行动：下注 ≥N（暗牌）/ ≥2N（已看牌）、弃牌、或开牌；**不能过牌**（`canCheck` 恒 false）。**庄位**：首手座位 0，此后**上一手赢家坐庄**（`TpState.lastWinnerId`），**庄先行动**（不能动则顺延）。基数 N 起始 10，**抬价即更新 N = ceil(实付 ÷ 倍数)**（暗除 1、明除 2，看牌注折半取整）；**开牌费 = 本回合下注成本（`N×倍数`，与下注同值）**入池但**不抬 N**。**看牌 `look` 仅自己回合、每手一次、免费不消耗回合**（`ApplyResult.advance:false`），看后全局明牌。**开牌对象只看看牌状态对等**：暗开所有暗牌对手、明开所有明牌对手（不限行动历史、含 all-in）；**输家亮牌（`revealed`）、赢家不亮**（暗开赢保持暗牌）。结束 = 弃/开到只剩一人；全员 all-in 无法行动时摊牌兜底。牌型 三条>同花顺>同花>顺子>对子>高牌（A23 最小顺），**同型比花色 spade>heart>club>diamond，永不平局**；底注/开牌费/下注都进 `totalBet` 参与边池分层
 - **三张牌机器人**（`tp/bot.ts`）：**开牌判断先于看牌**（支持闷开，不开状态不对等的对手）——三条+必开、同花顺系 40%、对子+15%；牌力>0.6 有 35% 概率保持暗牌（省 1× 注且保留闷开权），否则先看牌再按底池赔率下注/弃牌

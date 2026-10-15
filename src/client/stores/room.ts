@@ -31,6 +31,7 @@ export const room = reactive({
   botPlayers: [] as RoomSnapshot["botPlayers"],
   spectators: [] as RoomSnapshot["spectators"],
   borrowRequests: [] as RoomSnapshot["borrowRequests"],
+  borrowHistory: [] as RoomSnapshot["borrowHistory"],
   maxPlayers: 10,
   game: null as GameSnapshot | null,
 });
@@ -48,6 +49,7 @@ export function applyRoomSnapshot(snap: RoomSnapshot): void {
   room.botPlayers = snap.botPlayers || [];
   room.spectators = snap.spectators || [];
   room.borrowRequests = snap.borrowRequests || [];
+  room.borrowHistory = snap.borrowHistory || [];
   room.maxPlayers = snap.maxPlayers || 10;
   room.game = snap.game;
   applyChat(snap.chat, snap.chatTotal);
@@ -71,6 +73,7 @@ export function resetRoomState(): void {
   room.status = "waiting";
   room.cheatEnabled = true;
   room.borrowRequests = [];
+  room.borrowHistory = [];
   room.shortDeck = false;
   role.value = "player";
   resetChat();
@@ -111,7 +114,10 @@ export const readyStatusText = computed(() => {
   if (!room.game) return "";
   if (room.game.gameOver) return room.game.message || "对局结束";
   const req = room.game.requiredReady || [];
-  const waiting = req.filter((r) => !r.ready).map((r) => r.name);
+  const waiting = req.filter((r) => !r.ready).map((r) => {
+    const player = room.game?.players.find((p) => p.id === r.id);
+    return player?.chips === 0 ? `${r.name}（借款后准备）` : r.name;
+  });
   const done = req.length - waiting.length;
   if (!room.game.handOver) return "本手进行中";
   if (!waiting.length) return "全员已准备 · 开局中…";

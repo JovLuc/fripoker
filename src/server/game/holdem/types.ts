@@ -25,6 +25,6 @@ export interface GameState extends BaseGame {
   bbIndex: number;
   smallBlind: number;
   bigBlind: number;
-  /** Short deck (6+) rules: 36-card deck, trips>straight, flush>full house. */
+  /** Short deck (6+) rules: 36-card deck, straight>trips, flush>full house. */
   shortDeck: boolean;
 }

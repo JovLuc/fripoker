@@ -42,6 +42,7 @@ export class Room {
   /** Total messages ever (chat[] keeps only the last CHAT_HISTORY_KEEP). */
   chatTotal = 0;
   borrowRequests: { id: string; fromId: string; fromName: string; toId: string; amount: number }[] = [];
+  borrowHistory: { id: string; fromName: string; toName: string; amount: number; ts: number }[] = [];
   /** Humans ready for the next deal (hand-over flow); bots are always ready. */
   readyIds = new Set<string>();
   /** The only timer concept in a room: the delayed bot action. */
@@ -116,6 +117,10 @@ export function joinRoom(room: Room, playerId: string, playerName: string): Join
   if (alreadySeated) {
     const seat = room.humanPlayers.find((p) => p.id === playerId);
     if (seat) seat.name = playerName;
+    // A disconnect/leave marks the in-game seat left; reclaiming the same
+    // playerId restores future participation without undoing a current fold.
+    const gamePlayer = room.game?.players.find((p) => p.id === playerId);
+    if (gamePlayer) gamePlayer.left = false;
     room.spectators = room.spectators.filter((s) => s.id !== playerId);
     return { role: playerId === room.hostId ? "host" : "player" };
   }

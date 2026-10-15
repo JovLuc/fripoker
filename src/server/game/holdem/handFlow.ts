@@ -92,7 +92,8 @@ function postBlind(state: GameState, index: number, amount: number): void {
 /**
  * Deal a new hand. Charges debt interest first (skip the first deal after a
  * fresh borrow, then ×1.1 per hand), then rotates the button, posts blinds.
- * Returns false when fewer than 2 funded seats exist (game over).
+ * Returns false when fewer than 2 funded seats exist; live human seats may
+ * still borrow before the next hand, so only the room decides game over.
  */
 function resetHand(state: GameState): boolean {
   accrueInterest(state.players);
@@ -124,7 +125,10 @@ function resetHand(state: GameState): boolean {
   const elig = eligibleIndexes(state);
   if (elig.length < 2) {
     state.phase = "idle";
-    endGameIfBusted(state);
+    if (!endGameIfBusted(state)) {
+      state.handOver = true;
+      state.message = "等待破产玩家借款后准备";
+    }
     return false;
   }
 

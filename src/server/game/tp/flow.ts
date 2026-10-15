@@ -125,7 +125,10 @@ export function startHand(state: TpState): HandStep {
   if (elig.length < 2) {
     state.phase = "idle";
     state.actionIndex = -1;
-    endGameIfBusted(state);
+    if (!endGameIfBusted(state)) {
+      state.handOver = true;
+      state.message = "等待破产玩家借款后准备";
+    }
     return "hand-end";
   }
 
