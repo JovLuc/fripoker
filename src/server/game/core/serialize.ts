@@ -50,8 +50,8 @@ export function requiredReadyList(
   readyIds: ReadonlySet<string>,
 ): RequiredReadyPlayer[] {
   return g.players
-    .filter((p) => p.chips > 0 && !p.left)
-    .map((p) => ({ id: p.id, name: p.name, isBot: p.isBot, ready: p.isBot || readyIds.has(p.id) }));
+    .filter((p) => !p.left)
+    .map((p) => ({ id: p.id, name: p.name, isBot: p.isBot, ready: p.isBot || (p.chips > 0 && readyIds.has(p.id)) }));
 }
 
 /** Back-fill `n` face-down codes (["back","back"] for hold'em, 3 for tp). */

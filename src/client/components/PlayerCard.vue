@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PlayerView } from "../../shared/protocol.js";
+import { computed } from "vue";
 import { posText, rankOf, suitClass, suitOf } from "../lib/cards.js";
 import { room } from "../stores/room.js";
 import { requestBorrow, respondBorrow } from "../stores/session.js";
@@ -10,14 +11,14 @@ defineProps<{
   actionPlayerId: string | null;
 }>();
 
-function borrowFrom(p: PlayerView): void {
-  if (!p.isMe || p.chips !== 0 || !room.game) return;
-  const lenders = room.game.players.filter((x) => x.id !== p.id && x.chips > 0);
-  if (!lenders.length) return;
-  const target = prompt(`向谁借？输入玩家昵称：${lenders.map((x) => x.name).join("、")}`);
-  const lender = lenders.find((x) => x.name === target);
-  if (!lender) return;
-  const amount = Number(prompt(`向 ${lender.name} 借多少？最多 ${lender.chips}`));
+const topLenderIds = computed(() => new Set(
+  [...(room.game?.players ?? [])].filter((x) => x.chips > 0).sort((a, b) => b.chips - a.chips).slice(0, 2).map((x) => x.id),
+));
+
+function borrowFrom(lender: PlayerView): void {
+  const borrower = room.game?.players.find((x) => x.isMe);
+  if (!borrower || borrower.chips !== 0 || !topLenderIds.value.has(lender.id)) return;
+  const amount = Number(prompt(`向 ${lender.name} 借多少？最多 ${lender.chips}`, String(Math.max(1, Math.floor(lender.chips / 2)))));
   if (Number.isSafeInteger(amount) && amount > 0 && amount <= lender.chips) requestBorrow(lender.id, amount);
 }
 
@@ -56,7 +57,7 @@ function betView(p: PlayerView): { text: string; dim: boolean } {
     <!-- chip balance and available player-to-player borrowing -->
     <div class="chips-row">
       <span class="chips">{{ p.chips }}</span>
-      <button v-show="p.isMe && p.chips === 0 && room.game?.handOver && !room.game?.gameOver" class="repay-btn" type="button" @click="borrowFrom(p)">借筹码</button>
+      <button v-show="!p.isMe && topLenderIds.has(p.id) && room.game?.players.some(x => x.isMe && x.chips === 0) && room.game?.handOver && !room.game?.gameOver" class="repay-btn" type="button" @click="borrowFrom(p)">向我借</button>
       <template v-for="req in (p.isMe && room.game?.handOver && !room.game?.gameOver ? room.borrowRequests.filter(r => r.toId === profile.playerId) : [])" :key="req.id">
         <span class="small">{{ req.fromName }}申请借 {{ req.amount }}</span>
         <button class="repay-btn" type="button" @click="respondBorrow(req.id, true)">同意</button>

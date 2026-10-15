@@ -166,7 +166,7 @@ export class GameHost {
   private afterStep(room: Room, result: HandStep): void {
     if (!room.game) return;
     if (result === "hand-end") {
-      // Busts sit out; match continues while ≥2 seats still have chips.
+      // Busts sit out; live human seats can rebuy before the next deal.
       const added = noteBusted(room.game);
       room.readyIds = new Set();
       if (endGameIfBusted(room.game)) {
@@ -178,7 +178,7 @@ export class GameHost {
         const names = added.map((p) => p.name).join("、");
         room.game.message = `${names} 已破产 · 剩余玩家准备下一局`;
       }
-      // wait until all chips>0 players ready — then auto-deal
+      // Wait for every live human to have chips and ready; bots are automatic.
       this.events.broadcastRoom(room);
       return;
     }
@@ -221,7 +221,7 @@ export class GameHost {
 
 function allRequiredReady(room: Room): boolean {
   if (!room.game) return false;
-  const req = room.game.players.filter((p) => p.chips > 0 && !p.left);
-  if (req.length < 2) return false;
-  return req.every((p) => p.isBot || room.readyIds.has(p.id));
+  const active = room.game.players.filter((p) => !p.left);
+  if (active.filter((p) => p.chips > 0).length < 2) return false;
+  return active.every((p) => p.isBot || (p.chips > 0 && room.readyIds.has(p.id)));
 }

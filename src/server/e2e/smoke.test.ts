@@ -203,6 +203,7 @@ describe("e2e: full room flow", () => {
     expect(joined.payload.role).toBe("player");
     const snap = await bob2.next("room");
     expect(snap.payload.game!.iAmInGame).toBe(true);
+    expect(snap.payload.game!.players.find((p) => p.id === "p_bob")!.left).toBe(false);
     await bob2.close();
   });
 

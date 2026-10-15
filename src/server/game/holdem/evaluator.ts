@@ -1,8 +1,8 @@
 // 5–7 card hand evaluation. category 0..8 (high card → straight flush);
 // compareEval(a, b) > 0 means a wins. Names are Chinese for direct UI use.
 //
-// Short deck (6+) mode renumbers categories to the 6+ ranking — trips beat
-// straights, flushes beat full houses — and lets A-6-7-8-9 make the lowest
+// Short deck (6+) mode uses straight-over-trips and flush-over-full-house,
+// and lets A-6-7-8-9 make the lowest
 // straight. Both hands of a comparison are always evaluated in the same mode,
 // so compareEval stays a plain category/tiebreak comparison.
 
@@ -54,9 +54,9 @@ function findStraightFlush(cards: Card[], shortDeck: boolean): number {
 }
 
 export function evaluate7(cards: Card[], shortDeck = false): HandEval {
-  // In short deck trips sit above straights and flushes above full houses.
-  const catTrips = shortDeck ? 4 : 3;
-  const catStraight = shortDeck ? 3 : 4;
+  // In short deck only flush/full-house ordering changes; straights still beat trips.
+  const catTrips = 3;
+  const catStraight = 4;
   const catFlush = shortDeck ? 6 : 5;
   const catFull = shortDeck ? 5 : 6;
 
@@ -96,8 +96,8 @@ export function evaluate7(cards: Card[], shortDeck = false): HandEval {
     return null;
   };
 
-  // Long deck ranks the full house over the flush; short deck flips both
-  // pairs (flush > full house > trips > straight), so the two checks swap.
+  // Long deck ranks the full house over the flush; short deck flips them
+  // (flush > full house), while straight still beats trips.
   if (!shortDeck) {
     const fh = fullHouse();
     if (fh) return fh;

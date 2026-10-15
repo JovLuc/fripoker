@@ -24,6 +24,7 @@ export function serializeFor(room: Room, viewerId: string): RoomSnapshot {
     chat: room.chat.slice(-CHAT_HISTORY_KEEP),
     chatTotal: room.chatTotal,
     borrowRequests: room.borrowRequests,
+    borrowHistory: room.borrowHistory,
   };
 
   if (!room.game) return { ...base, game: null };

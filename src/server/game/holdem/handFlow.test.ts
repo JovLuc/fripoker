@@ -92,14 +92,14 @@ describe("startHand", () => {
     expect(state.pot).toBe(SMALL_BLIND + BIG_BLIND);
   });
 
-  it("game over when fewer than 2 funded seats", () => {
+  it("keeps the loan window open when a live human can rebuy", () => {
     const state = headsUpState();
     state.players[0].chips = 0;
     const step = startHand(state);
     expect(step).toBe("hand-end");
-    expect(state.gameOver).toBe(true);
+    expect(state.gameOver).toBe(false);
     expect(state.handOver).toBe(true);
-    expect(state.message).toContain("对局结束");
+    expect(state.message).toContain("借款");
   });
 });
 

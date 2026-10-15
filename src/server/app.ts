@@ -277,7 +277,12 @@ export function createServerApp(config: ServerConfig): ServerApp {
           const from = room.game.players.find((p) => p.id === req.fromId);
           const to = room.game.players.find((p) => p.id === req.toId);
           if (!from || !to || from.chips !== 0 || to.chips < req.amount) conn.sendError("筹码已变化，交易未成功");
-          else { from.chips += req.amount; to.chips -= req.amount; from.sittingOut = true; }
+          else {
+            from.chips += req.amount;
+            to.chips -= req.amount;
+            from.sittingOut = true;
+            room.borrowHistory.push({ id: req.id, fromName: from.name, toName: to.name, amount: req.amount, ts: Date.now() });
+          }
         }
         broadcastRoom(room); return;
       }

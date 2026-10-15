@@ -21,6 +21,8 @@ const holdem = computed(() => (room.game?.kind === "holdem" ? room.game : null))
       <div class="busted-log">
         <div v-show="bustedList.length" class="busted-title">破产</div>
         <div v-for="b in bustedList" :key="b.id" class="busted-line">{{ b.name }}已破产</div>
+        <div v-show="room.borrowHistory.length" class="busted-title">借款</div>
+        <div v-for="b in room.borrowHistory.slice(-5)" :key="b.id" class="busted-line">{{ b.fromName }}向{{ b.toName }}借 {{ b.amount }}</div>
       </div>
       <!-- hold'em: five community slots; three-card: nothing (band stays reserved) -->
       <div class="board">
